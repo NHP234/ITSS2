@@ -2,7 +2,7 @@ import { Target, ListTodo, Clock, Calendar as CalendarIcon, CheckCircle2 } from 
 
 export function Home() {
   return (
-    <div className="flex-1 overflow-auto bg-[#191919] text-white p-8">
+    <div className="min-h-full bg-[#191919] text-white p-8">
       <h1 className="text-3xl font-bold mb-2">Trang chủ</h1>
       <p className="text-gray-400 mb-8">Chào mừng bạn quay lại. Dưới đây là tổng quan công việc của bạn.</p>
       

@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Input } from './ui/input';
 import { Calendar } from './ui/calendar';
 import { Switch } from './ui/switch';
 import { ChevronRight } from 'lucide-react';
+import { DateRange } from 'react-day-picker';
 
 interface CustomDatePickerProps {
   date?: Date;
+  range?: DateRange;
   onSelect?: (date: Date | undefined) => void;
+  onRangeSelect?: (range: DateRange | undefined) => void;
   trigger: React.ReactNode;
+  mode?: 'single' | 'range';
 }
 
-export function CustomDatePicker({ date, onSelect, trigger }: CustomDatePickerProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(date || new Date(2026, 3, 26));
+export function CustomDatePicker({ date, range, onSelect, onRangeSelect, trigger, mode = 'single' }: CustomDatePickerProps) {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(date);
+  const [selectedRange, setSelectedRange] = useState<DateRange | undefined>(range);
+  const [isRangeMode, setIsRangeMode] = useState(mode === 'range' || !!range);
   
   return (
     <Popover>
@@ -20,18 +27,47 @@ export function CustomDatePicker({ date, onSelect, trigger }: CustomDatePickerPr
       </PopoverTrigger>
       <PopoverContent className="w-80 bg-[#1e1e1e] border-[#333] text-gray-200 p-0 shadow-xl rounded-xl" align="start">
         <div className="p-4 space-y-4">
-          <div className="bg-[#2a2a2a] rounded-md p-2 border border-gray-700/50">
-            <span className="text-blue-200 bg-blue-500/20 px-1 rounded select-none">
-              {selectedDate ? `${selectedDate.getDate()}/${selectedDate.getMonth() + 1}/${selectedDate.getFullYear()}` : '26/4/2026'}
+          <div className="flex gap-2 mb-2">
+            <div className="flex-1 space-y-1">
+              <Input 
+                className="h-9 bg-[#2a2a2a] border-gray-700 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                placeholder="Ngày bắt đầu"
+                value={selectedRange?.from ? selectedRange.from.toLocaleDateString('vi-VN') : (selectedDate ? selectedDate.toLocaleDateString('vi-VN') : '')}
+                readOnly
+              />
+            </div>
+            {isRangeMode && (
+              <div className="flex-1 space-y-1">
+                <Input 
+                  className="h-9 bg-[#2a2a2a] border-gray-700 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                  placeholder="Ngày kết thúc"
+                  value={selectedRange?.to ? selectedRange.to.toLocaleDateString('vi-VN') : ''}
+                  readOnly
+                />
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center justify-between px-1 mb-2">
+            <span className="text-sm font-bold">
+              {isRangeMode ? 'Chọn khoảng ngày' : 'Chọn ngày'}
             </span>
+            <div className="flex gap-2">
+              <button className="text-xs text-gray-400 hover:text-white transition-colors">Hôm nay</button>
+            </div>
           </div>
           
           <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={(d) => {
-              setSelectedDate(d);
-              if (onSelect) onSelect(d);
+            mode={isRangeMode ? "range" : "single"}
+            selected={(isRangeMode ? selectedRange : selectedDate) as any}
+            onSelect={(val: any) => {
+              if (isRangeMode) {
+                setSelectedRange(val);
+                if (onRangeSelect) onRangeSelect(val);
+              } else {
+                setSelectedDate(val);
+                if (onSelect) onSelect(val);
+              }
             }}
             className="p-0"
             classNames={{
@@ -49,7 +85,11 @@ export function CustomDatePicker({ date, onSelect, trigger }: CustomDatePickerPr
           <div className="space-y-4 pt-4 border-t border-gray-800">
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-gray-200">Ngày kết thúc</span>
-              <Switch className="data-[state=checked]:bg-blue-600" />
+              <Switch 
+                checked={isRangeMode}
+                onCheckedChange={setIsRangeMode}
+                className="data-[state=checked]:bg-blue-600" 
+              />
             </div>
             
             <button className="flex items-center justify-between w-full hover:bg-gray-800 p-1 -mx-1 rounded">
@@ -75,7 +115,12 @@ export function CustomDatePicker({ date, onSelect, trigger }: CustomDatePickerPr
           </div>
           
           <div className="pt-4 border-t border-gray-800">
-            <button className="text-sm font-bold text-gray-200 hover:text-white" onClick={() => setSelectedDate(undefined)}>
+            <button className="text-sm font-bold text-gray-200 hover:text-white" onClick={() => {
+              setSelectedDate(undefined);
+              setSelectedRange(undefined);
+              if (onSelect) onSelect(undefined);
+              if (onRangeSelect) onRangeSelect(undefined);
+            }}>
               Xóa
             </button>
           </div>

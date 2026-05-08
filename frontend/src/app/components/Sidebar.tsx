@@ -1,4 +1,4 @@
-import { Target, ListTodo, User, Bell, Settings, Search, Home } from 'lucide-react';
+import { Target, ListTodo, User, Bell, Settings, Search, Home, LogOut } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -16,21 +16,21 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const iconColor = (tabId: string) => activeTab === tabId ? 'text-blue-400' : 'text-gray-400';
 
   return (
-    <div className="w-64 h-full bg-[#1e1e1e] border-r border-gray-800 flex flex-col text-gray-300 shrink-0">
-      <div className="p-4 flex items-center gap-3 mb-2 cursor-pointer hover:bg-[#2a2a2a] m-2 rounded-md transition-colors" onClick={() => onTabChange('home')}>
-        <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white font-bold shadow-sm">
+    <div className="w-56 h-full bg-[#1e1e1e] border-r border-gray-800 flex flex-col text-gray-300 shrink-0">
+      <div className="p-3 flex items-center gap-2.5 mb-1 cursor-pointer hover:bg-[#2a2a2a] m-1.5 rounded-md transition-colors" onClick={() => onTabChange('home')}>
+        <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center text-white text-sm font-bold shadow-sm">
           W
         </div>
-        <span className="font-semibold text-white truncate">My Workspace</span>
+        <span className="font-semibold text-white truncate text-sm">My Workspace</span>
       </div>
 
-      <div className="px-4 mb-6">
+      <div className="px-3 mb-4">
         <div className="relative group">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
           <input 
             type="text" 
             placeholder="Tìm kiếm..." 
-            className="w-full bg-[#2a2a2a] text-white border border-transparent focus:border-gray-600 rounded-md py-1.5 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-gray-500"
+            className="w-full bg-[#2a2a2a] text-white border border-transparent focus:border-gray-600 rounded-md py-1.5 pl-8 pr-2 text-xs outline-none transition-colors placeholder:text-gray-500"
           />
         </div>
       </div>
@@ -72,6 +72,10 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         <button className={navItemClass('settings')} onClick={() => onTabChange('settings')}>
           <Settings className={`w-4 h-4 ${iconColor('settings')}`} />
           Cài đặt
+        </button>
+        <button className="w-full flex items-center gap-3 px-3 py-2 mt-1 rounded-md text-sm transition-colors text-red-400 hover:text-red-300 hover:bg-[#2a2a2a]" onClick={() => onTabChange('logout')}>
+          <LogOut className="w-4 h-4" />
+          Đăng xuất
         </button>
       </div>
     </div>

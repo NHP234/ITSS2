@@ -3,25 +3,64 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from './ui/
 import { Button } from './ui/button';
 import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Image as ImageIcon, LayoutTemplate } from 'lucide-react';
 import { CustomDatePicker } from './CustomDatePicker';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { searchUsers } from '../../api';
+import { UserPlus, X, CheckCircle2 } from 'lucide-react';
 
 interface CreateProjectDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (name: string, description: string) => void;
+  onCreate: (data: any) => void;
+  currentUser?: { name: string };
 }
 
-export function CreateProjectDialog({ open, onClose, onCreate }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: CreateProjectDialogProps) {
   const [name, setName] = useState('New Project');
   const [description, setDescription] = useState('');
+  const [dates, setDates] = useState('');
+  const [members, setMembers] = useState<any[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onCreate(name, description);
+      onCreate({
+        name,
+        description,
+        dates,
+        memberIds: members.map(m => m.id)
+      });
       setName('New Project');
       setDescription('');
+      setDates('');
+      setMembers([]);
       onClose();
     }
+  };
+
+  const handleSearchUsers = async (q: string) => {
+    setUserSearch(q);
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      const results = await searchUsers(q);
+      setSearchResults(results.filter(u => !members.some(m => m.id === u.id)));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const addMember = (user: any) => {
+    setMembers([...members, user]);
+    setUserSearch('');
+    setSearchResults([]);
+  };
+
+  const removeMember = (id: string) => {
+    setMembers(members.filter(m => m.id !== id));
   };
 
   const tasksByStatus = {
@@ -81,7 +120,70 @@ export function CreateProjectDialog({ open, onClose, onCreate }: CreateProjectDi
                     <span>Owner</span>
                   </div>
                   <div className="text-gray-400">
-                    Trống
+                    {currentUser?.name || 'Trống'}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <UserPlus className="w-4 h-4" />
+                    <span>Members</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                      {members.map(m => (
+                        <div key={m.id} className="w-6 h-6 rounded-full bg-blue-600 border border-[#191919] flex items-center justify-center text-[10px] font-bold">
+                          {m.name.charAt(0).toUpperCase()}
+                        </div>
+                      ))}
+                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="p-1 hover:bg-gray-800 rounded transition-colors text-blue-400">
+                          <UserPlus className="w-4 h-4" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 bg-[#1e1e1e] border-[#333] p-0 shadow-2xl rounded-xl">
+                        <div className="p-3 border-b border-gray-800">
+                          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Thêm thành viên</h4>
+                        </div>
+                        <div className="p-2">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-2 w-3 h-3 text-gray-500" />
+                            <input 
+                              className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md py-1.5 pl-7 pr-2 text-xs outline-none focus:border-blue-500"
+                              placeholder="Tìm theo email hoặc tên..."
+                              value={userSearch}
+                              onChange={(e) => handleSearchUsers(e.target.value)}
+                            />
+                          </div>
+                          <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                            {searchResults.map(u => (
+                              <button 
+                                key={u.id} 
+                                type="button"
+                                onClick={() => addMember(u)}
+                                className="w-full flex items-center gap-2 p-1.5 hover:bg-blue-600 rounded text-left transition-colors"
+                              >
+                                <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center text-[9px]">{u.name.charAt(0).toUpperCase()}</div>
+                                <div className="flex flex-col">
+                                  <span className="text-xs">{u.name}</span>
+                                  <span className="text-[10px] opacity-70">{u.email}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {members.length > 0 && (
+                          <div className="p-2 border-t border-gray-800 max-h-32 overflow-y-auto">
+                            {members.map(m => (
+                              <div key={m.id} className="flex items-center justify-between p-1">
+                                <span className="text-[10px] text-gray-400">{m.email}</span>
+                                <button type="button" onClick={() => removeMember(m.id)}><X className="w-3 h-3 text-gray-500 hover:text-red-400" /></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div className="flex items-center gap-2 text-gray-400">
@@ -89,11 +191,23 @@ export function CreateProjectDialog({ open, onClose, onCreate }: CreateProjectDi
                     <span>Dates</span>
                   </div>
                   <div>
-                    <CustomDatePicker trigger={
-                      <button type="button" className="text-gray-400 hover:text-gray-300 hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors">
-                        Trống
-                      </button>
-                    } />
+                    <CustomDatePicker 
+                      mode="range"
+                      trigger={
+                        <button type="button" className="text-gray-400 hover:text-gray-300 hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors">
+                          {dates || 'Trống'}
+                        </button>
+                      } 
+                      onRangeSelect={(range) => {
+                        if (range?.from) {
+                          const fromStr = `${range.from.getDate()} tháng ${range.from.getMonth() + 1}, ${range.from.getFullYear()}`;
+                          const toStr = range.to ? ` → ${range.to.getDate()} tháng ${range.to.getMonth() + 1}, ${range.to.getFullYear()}` : '';
+                          setDates(`${fromStr}${toStr}`);
+                        } else {
+                          setDates('');
+                        }
+                      }}
+                    />
                   </div>
                 </div>
 
