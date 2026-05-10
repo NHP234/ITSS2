@@ -82,7 +82,6 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     if (res.status === 401) {
-      // Có thể xử lý logout ở đây nếu muốn
       localStorage.removeItem('token');
     }
     throw new Error(body.error ?? `HTTP ${res.status}`);

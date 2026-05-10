@@ -62,9 +62,7 @@ export default function App() {
       setTasks(tasksData);
     } catch (err) {
       console.error('Lỗi khi tải dữ liệu:', err);
-      // Nếu lỗi 401, setIsAuthenticated(false)
       setIsAuthenticated(false);
-      // Không cần hiển thị error bự trừ khi backend chết thực sự
     } finally {
       setLoading(false);
     }
@@ -86,7 +84,7 @@ export default function App() {
 
   const handleCreateProject = async (data: any) => {
     try {
-      const newProject = await createProject({
+      await createProject({
         ...data,
         status: 'Planning',
         owner: user?.name || '',
@@ -95,7 +93,6 @@ export default function App() {
         blockedBy: '',
         icon: '🎯',
       });
-      // Fetch lại để có đầy đủ members từ server
       const projectsData = await getProjects();
       setProjects(projectsData);
     } catch (err) {
@@ -112,7 +109,6 @@ export default function App() {
       if (selectedProjectId === projectId) setSelectedProjectId(null);
     } catch (err) {
       console.error('Lỗi xoá dự án:', err);
-      alert('Không thể xoá dự án. Vui lòng thử lại.');
     }
   };
 
@@ -131,7 +127,6 @@ export default function App() {
         projectId: currentProjectIdForTask,
       });
       setTasks(prev => [...prev, newTask]);
-      // Cập nhật completion của project từ server
       const { getProject } = await import('../api');
       const updatedProject = await getProject(currentProjectIdForTask);
       setProjects(prev =>
@@ -146,7 +141,6 @@ export default function App() {
     try {
       const updated = await updateTaskStatus(taskId, status);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: updated.status } : t));
-      // Cập nhật completion của project
       const task = tasks.find(t => t.id === taskId);
       if (task) {
         const { getProject } = await import('../api');
@@ -164,8 +158,6 @@ export default function App() {
     try {
       const updated = await updateTask(taskId, updates);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updated } : t));
-      
-      // Nếu weight hoặc status thay đổi, cần cập nhật completion của project
       if (updates.weight !== undefined || updates.status !== undefined) {
         const { getProject } = await import('../api');
         const updatedProject = await getProject(updated.projectId);
@@ -183,7 +175,6 @@ export default function App() {
       const task = tasks.find(t => t.id === taskId);
       await deleteTask(taskId);
       setTasks(prev => prev.filter(t => t.id !== taskId));
-      // Cập nhật completion của project
       if (task) {
         const { getProject } = await import('../api');
         const updatedProject = await getProject(task.projectId);
@@ -196,13 +187,11 @@ export default function App() {
     }
   };
 
-  // ─── Derived state ────────────────────────────────────────────────────────────
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const projectTasks = selectedProjectId
     ? tasks.filter(t => t.projectId === selectedProjectId)
     : [];
 
-  // ─── Loading / Error States ───────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex h-screen w-full bg-[#191919] items-center justify-center">
@@ -218,24 +207,6 @@ export default function App() {
     return <Login onLoginSuccess={fetchAll} />;
   }
 
-  if (error) {
-    return (
-      <div className="flex h-screen w-full bg-[#191919] items-center justify-center">
-        <div className="text-center max-w-md px-6">
-          <div className="text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-red-400 mb-2">Lỗi kết nối</h2>
-          <p className="text-gray-400 text-sm mb-6">{error}</p>
-          <button
-            onClick={fetchAll}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors"
-          >
-            Thử lại
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen w-full bg-[#191919] overflow-hidden">
       <Sidebar activeTab={activeTab} onTabChange={(tab) => {
@@ -246,7 +217,6 @@ export default function App() {
           return;
         }
         setActiveTab(tab);
-        // Luôn reset về trang tổng khi nhấn vào tab
         setSelectedProjectId(null);
       }} />
       <div className="flex-1 h-full overflow-y-auto relative bg-[#191919]">
