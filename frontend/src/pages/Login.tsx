@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { login, register } from '../../api';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/card';
+import { login, register } from '../api';
 
 interface LoginProps {
   onLoginSuccess: () => void;

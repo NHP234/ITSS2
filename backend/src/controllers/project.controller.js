@@ -3,7 +3,7 @@ const projectService = require('../services/project.service');
 // GET /api/projects
 async function getAll(req, res) {
   try {
-    const projects = await projectService.getAllProjects();
+    const projects = await projectService.getAllProjects(req.userId);
     res.json(projects);
   } catch (err) {
     console.error('[Project] getAll:', err.message);
@@ -30,7 +30,7 @@ async function create(req, res) {
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Tên dự án không được để trống' });
     }
-    const project = await projectService.createProject(req.body);
+    const project = await projectService.createProject(req.body, req.userId);
     res.status(201).json(project);
   } catch (err) {
     console.error('[Project] create:', err.message);

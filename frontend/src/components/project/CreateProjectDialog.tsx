@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from './ui/sheet';
-import { Button } from './ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '../ui/sheet';
+import { Button } from '../ui/button';
 import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Image as ImageIcon, LayoutTemplate } from 'lucide-react';
-import { CustomDatePicker } from './CustomDatePicker';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { CustomDatePicker } from '../common/CustomDatePicker';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { searchUsers } from '../../api';
 import { UserPlus, X, CheckCircle2 } from 'lucide-react';
 
@@ -16,11 +16,17 @@ interface CreateProjectDialogProps {
 
 export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: CreateProjectDialogProps) {
   const [name, setName] = useState('New Project');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState('Dự án này tập trung vào...');
   const [dates, setDates] = useState('');
+  const [comment, setComment] = useState('');
   const [members, setMembers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [projectTasks, setProjectTasks] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+  const [taskSearch, setTaskSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
+  const [showDoneTasks, setShowDoneTasks] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +35,8 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
         name,
         description,
         dates,
-        memberIds: members.map(m => m.id)
+        memberIds: members.map(m => m.id),
+        tasks: projectTasks // Giả sử backend hỗ trợ tạo kèm tasks
       });
       setName('New Project');
       setDescription('');
@@ -62,11 +69,47 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
   const removeMember = (id: string) => {
     setMembers(members.filter(m => m.id !== id));
   };
+  
+  const addNewTask = (status: string = 'Not Started') => {
+    const title = prompt('Nhập tiêu đề công việc:');
+    if (title) {
+      setProjectTasks([...projectTasks, {
+        id: Math.random().toString(36).substr(2, 9),
+        title,
+        status,
+        createdAt: new Date().toISOString()
+      }]);
+    }
+  };
+
+  const generateAITasks = () => {
+    const aiTasks = [
+      { id: 'ai-1', title: 'Phân tích yêu cầu khách hàng', status: 'In Progress', createdAt: new Date().toISOString() },
+      { id: 'ai-2', title: 'Thiết kế giao diện (UI/UX)', status: 'Not Started', createdAt: new Date().toISOString() },
+      { id: 'ai-3', title: 'Thiết lập môi trường phát triển', status: 'Done', createdAt: new Date().toISOString() },
+    ];
+    setProjectTasks([...projectTasks, ...aiTasks]);
+  };
+
+  let filteredTasks = projectTasks.filter(t => 
+    t.title.toLowerCase().includes(taskSearch.toLowerCase())
+  );
+
+  if (!showDoneTasks) {
+    filteredTasks = filteredTasks.filter(t => t.status !== 'Done');
+  }
+
+  if (sortOrder !== 'none') {
+    filteredTasks.sort((a, b) => {
+      if (sortOrder === 'asc') return a.title.localeCompare(b.title);
+      return b.title.localeCompare(a.title);
+    });
+  }
 
   const tasksByStatus = {
-    'Not Started': [],
-    'In Progress': [],
-    'Done': [],
+    'Not Started': filteredTasks.filter(t => t.status === 'Not Started'),
+    'In Progress': filteredTasks.filter(t => t.status === 'In Progress'),
+    'Done': filteredTasks.filter(t => t.status === 'Done'),
   };
 
   return (
@@ -230,59 +273,91 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
 
                 <div>
                   <p className="text-sm font-semibold text-gray-300 mb-2">Bình luận</p>
-                  <button type="button" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-400 group">
-                    <div className="w-6 h-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xs text-gray-300">
-                      B
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold">
+                      {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
                     </div>
-                    <span className="border-b border-transparent group-hover:border-gray-500">Thêm bình luận...</span>
-                  </button>
+                    <input 
+                      className="flex-1 bg-[#222] border border-gray-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-blue-500 transition-colors"
+                      placeholder="Thêm bình luận..."
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2 pt-4 border-t border-gray-800">
+              <div className="space-y-4 pt-6 border-t border-gray-800">
                 <h3 className="text-xl font-bold">About this project</h3>
-                <ul className="list-disc list-inside text-gray-400 pt-2 pl-2">
-                  <li>Danh sách</li>
-                </ul>
+                <textarea 
+                  className="w-full bg-transparent border-none outline-none text-gray-400 text-sm leading-relaxed min-h-[100px] resize-none focus:text-gray-300"
+                  placeholder="Nhập mô tả dự án tại đây..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
               </div>
 
               <div className="pt-8">
                 <h2 className="text-2xl font-bold mb-4">Project tasks</h2>
 
                 <div className="flex items-center gap-2 mb-4 pb-3">
-                  <Button variant="ghost" size="sm" className="bg-[#333333] text-white hover:bg-[#444444] rounded-full px-4">
-                    <LayoutGrid className="w-4 h-4 mr-2" />
-                    Board
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="bg-[#333333] text-white hover:bg-[#444444] rounded-full px-4"
+                    onClick={() => setViewMode(viewMode === 'board' ? 'list' : 'board')}
+                  >
+                    {viewMode === 'board' ? <LayoutGrid className="w-4 h-4 mr-2" /> : <List className="w-4 h-4 mr-2" />}
+                    {viewMode === 'board' ? 'Board' : 'List'}
                     <ChevronDown className="w-4 h-4 ml-1 text-gray-400" />
                   </Button>
 
                   <div className="flex-1" />
 
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-blue-400 hover:bg-gray-800 hover:text-blue-300">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className={`w-8 h-8 ${!showDoneTasks ? 'text-blue-400 bg-blue-400/10' : 'text-gray-400'} hover:bg-gray-800`}
+                      onClick={() => setShowDoneTasks(!showDoneTasks)}
+                      title="Lọc công việc"
+                    >
                       <Filter className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className={`w-8 h-8 ${sortOrder !== 'none' ? 'text-blue-400 bg-blue-400/10' : 'text-gray-400'} hover:bg-gray-800`}
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : (sortOrder === 'desc' ? 'none' : 'asc'))}
+                      title="Sắp xếp"
+                    >
                       <ArrowUpDown className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                      <Zap className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-blue-400 hover:bg-gray-800 hover:text-blue-300">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="w-8 h-8 text-blue-400 hover:bg-blue-400/10"
+                      onClick={generateAITasks}
+                      title="Gợi ý bởi AI"
+                    >
                       <Sparkles className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                      <Search className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                      <Maximize2 className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                      <SlidersHorizontal className="w-4 h-4" />
-                    </Button>
+                    <div className="relative flex items-center bg-[#222] rounded-lg border border-gray-800 px-2">
+                      <Search className="w-3.5 h-3.5 text-gray-500 mr-2" />
+                      <input 
+                        className="bg-transparent text-xs py-1.5 outline-none w-32 focus:w-48 transition-all"
+                        placeholder="Tìm công việc..."
+                        value={taskSearch}
+                        onChange={(e) => setTaskSearch(e.target.value)}
+                      />
+                    </div>
                     
                     <div className="flex items-center ml-2 rounded-md overflow-hidden bg-blue-600">
-                      <button type="button" className="px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                      <button 
+                        type="button" 
+                        onClick={() => addNewTask()}
+                        className="px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                      >
                         Mới
                       </button>
                       <div className="w-px h-full bg-blue-500/50"></div>
@@ -316,19 +391,25 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                           </div>
                         </div>
 
-                        <div className="space-y-2 flex-1">
-                          <button
-                            type="button"
-                            className={`w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-2 transition-colors border ${
-                              isNotStarted ? 'text-gray-300 border-gray-700 hover:bg-gray-800/50' :
-                              isInProgress ? 'text-blue-400 border-blue-900/60 hover:bg-blue-900/20' :
-                              'text-green-400 border-green-900/60 hover:bg-green-900/20'
-                            }`}
-                          >
-                            <Plus className="w-4 h-4" />
-                            Nhiệm vụ mới
-                          </button>
-                        </div>
+                          <div className="space-y-2 flex-1">
+                            {statusTasks.map((t: any) => (
+                              <div key={t.id} className="bg-[#2a2a2a] p-3 rounded-lg border border-gray-700/50 shadow-sm group hover:border-gray-600 transition-all">
+                                <p className="text-sm font-medium text-gray-200">{t.title}</p>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => addNewTask(status)}
+                              className={`w-full text-left px-3 py-2 text-xs rounded-lg flex items-center gap-2 transition-colors border mt-2 ${
+                                isNotStarted ? 'text-gray-400 border-gray-700 hover:bg-gray-800/50' :
+                                isInProgress ? 'text-blue-400 border-blue-900/40 hover:bg-blue-900/20' :
+                                'text-green-400 border-green-900/40 hover:bg-green-900/20'
+                              }`}
+                            >
+                              <Plus className="w-3 h-3" />
+                              Nhiệm vụ mới
+                            </button>
+                          </div>
                       </div>
                     );
                   })}

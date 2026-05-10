@@ -1,21 +1,11 @@
 import { useState } from 'react';
 import { Plus, CircleDot, ChevronDown, Target, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, LayoutGrid, Calendar, Trash2 } from 'lucide-react';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Progress } from './ui/progress';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Progress } from '../components/ui/progress';
+import { CustomDatePicker } from '../components/common/CustomDatePicker';
 
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: string;
-  owner: string;
-  dates: string;
-  priority: string;
-  completion: number;
-  blockedBy: string;
-  icon: string;
-}
+import { type Project } from '../api';
 
 interface ProjectListProps {
   projects: Project[];

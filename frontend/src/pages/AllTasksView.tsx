@@ -3,27 +3,11 @@ import {
   CheckSquare, Target, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, 
   ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2
 } from 'lucide-react';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { CustomDatePicker } from './CustomDatePicker';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { CustomDatePicker } from '../components/common/CustomDatePicker';
 
-interface Project {
-  id: string;
-  name: string;
-  icon: string;
-}
-
-interface Task {
-  id: string;
-  title: string;
-  status: string;
-  projectId: string;
-  assignee?: string;
-  due?: string;
-  priority?: string;
-  summary?: string;
-  icon?: string;
-}
+import { type Project, type Task } from '../api';
 
 interface AllTasksViewProps {
   projects: Project[];

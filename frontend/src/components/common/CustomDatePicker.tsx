@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Input } from './ui/input';
-import { Calendar } from './ui/calendar';
-import { Switch } from './ui/switch';
+import { useState, useEffect } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Input } from '../ui/input';
+import { Calendar } from '../ui/calendar';
+import { Switch } from '../ui/switch';
 import { ChevronRight } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
+import { format, parse, isValid } from 'date-fns';
 
 interface CustomDatePickerProps {
   date?: Date;
@@ -19,6 +20,45 @@ export function CustomDatePicker({ date, range, onSelect, onRangeSelect, trigger
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(date);
   const [selectedRange, setSelectedRange] = useState<DateRange | undefined>(range);
   const [isRangeMode, setIsRangeMode] = useState(mode === 'range' || !!range);
+
+  // States for manual input
+  const [fromInput, setFromInput] = useState('');
+  const [toInput, setToInput] = useState('');
+
+  // Sync inputs with selected values
+  useEffect(() => {
+    if (isRangeMode) {
+      setFromInput(selectedRange?.from ? format(selectedRange.from, 'dd/MM/yyyy') : '');
+      setToInput(selectedRange?.to ? format(selectedRange.to, 'dd/MM/yyyy') : '');
+    } else {
+      setFromInput(selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '');
+    }
+  }, [selectedRange, selectedDate, isRangeMode]);
+
+  const handleManualInput = (val: string, type: 'from' | 'to') => {
+    if (type === 'from') {
+      setFromInput(val);
+      const parsed = parse(val, 'dd/MM/yyyy', new Date());
+      if (isValid(parsed) && val.length === 10) {
+        if (isRangeMode) {
+          const newRange = { ...selectedRange, from: parsed } as DateRange;
+          setSelectedRange(newRange);
+          if (onRangeSelect) onRangeSelect(newRange);
+        } else {
+          setSelectedDate(parsed);
+          if (onSelect) onSelect(parsed);
+        }
+      }
+    } else {
+      setToInput(val);
+      const parsed = parse(val, 'dd/MM/yyyy', new Date());
+      if (isValid(parsed) && val.length === 10) {
+        const newRange = { ...selectedRange, to: parsed } as DateRange;
+        setSelectedRange(newRange);
+        if (onRangeSelect) onRangeSelect(newRange);
+      }
+    }
+  };
   
   return (
     <Popover>
@@ -31,18 +71,18 @@ export function CustomDatePicker({ date, range, onSelect, onRangeSelect, trigger
             <div className="flex-1 space-y-1">
               <Input 
                 className="h-9 bg-[#2a2a2a] border-gray-700 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-                placeholder="Ngày bắt đầu"
-                value={selectedRange?.from ? selectedRange.from.toLocaleDateString('vi-VN') : (selectedDate ? selectedDate.toLocaleDateString('vi-VN') : '')}
-                readOnly
+                placeholder="DD/MM/YYYY"
+                value={fromInput}
+                onChange={(e) => handleManualInput(e.target.value, 'from')}
               />
             </div>
             {isRangeMode && (
               <div className="flex-1 space-y-1">
                 <Input 
                   className="h-9 bg-[#2a2a2a] border-gray-700 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-                  placeholder="Ngày kết thúc"
-                  value={selectedRange?.to ? selectedRange.to.toLocaleDateString('vi-VN') : ''}
-                  readOnly
+                  placeholder="DD/MM/YYYY"
+                  value={toInput}
+                  onChange={(e) => handleManualInput(e.target.value, 'to')}
                 />
               </div>
             )}
@@ -53,7 +93,23 @@ export function CustomDatePicker({ date, range, onSelect, onRangeSelect, trigger
               {isRangeMode ? 'Chọn khoảng ngày' : 'Chọn ngày'}
             </span>
             <div className="flex gap-2">
-              <button className="text-xs text-gray-400 hover:text-white transition-colors">Hôm nay</button>
+              <button 
+                type="button"
+                className="text-xs text-gray-400 hover:text-white transition-colors"
+                onClick={() => {
+                  const today = new Date();
+                  if (isRangeMode) {
+                    const newRange = { from: today, to: undefined };
+                    setSelectedRange(newRange);
+                    if (onRangeSelect) onRangeSelect(newRange);
+                  } else {
+                    setSelectedDate(today);
+                    if (onSelect) onSelect(today);
+                  }
+                }}
+              >
+                Hôm nay
+              </button>
             </div>
           </div>
           

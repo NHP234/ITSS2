@@ -38,6 +38,20 @@ async function main() {
     },
   });
 
+  const p3 = await prisma.project.create({
+    data: {
+      name: 'Đồ án Chuyên ngành',
+      description: 'Đồ án quan trọng sắp đến hạn',
+      status: 'In Progress',
+      owner: 'Bình',
+      dates: '01 tháng 1, 2026 → 15 tháng 5, 2026',
+      priority: 'High',
+      completion: 45,
+      blockedBy: '',
+      icon: '🎓',
+    },
+  });
+
   // Tạo tasks mẫu cho p1
   await prisma.task.createMany({
     data: [
@@ -59,10 +73,10 @@ async function main() {
   });
 
   // Cập nhật completion % sau khi tạo tasks
-  for (const p of [p1, p2]) {
+  for (const p of [p1, p2, p3]) {
     const tasks = await prisma.task.findMany({ where: { projectId: p.id } });
     const done = tasks.filter(t => t.status === 'Done').length;
-    const completion = tasks.length > 0 ? Math.round((done / tasks.length) * 10000) / 100 : 0;
+    const completion = tasks.length > 0 ? Math.round((done / tasks.length) * 10000) / 100 : p.completion;
     await prisma.project.update({ where: { id: p.id }, data: { completion } });
   }
 

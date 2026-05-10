@@ -3,10 +3,17 @@ const { recalculateCompletion } = require('./project.service');
 
 const VALID_STATUSES = ['Not Started', 'In Progress', 'Done'];
 
-// ─── Lấy tất cả tasks (tuỳ chọn filter theo projectId) ───────────────────────
-async function getAllTasks(projectId) {
+// ─── Lấy tất cả tasks mà user có quyền xem (tuỳ chọn filter theo projectId) ──
+async function getAllTasks(projectId, userId) {
   return prisma.task.findMany({
-    where: projectId ? { projectId } : undefined,
+    where: {
+      projectId: projectId || undefined,
+      project: {
+        members: {
+          some: { id: userId }
+        }
+      }
+    },
     orderBy: { createdAt: 'asc' },
     include: { assignees: { select: { id: true, name: true, email: true } } },
   });

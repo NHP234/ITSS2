@@ -4,7 +4,7 @@ const taskService = require('../services/task.service');
 async function getAll(req, res) {
   try {
     const projectId = req.query.projectId ?? req.params.id;
-    const tasks = await taskService.getAllTasks(projectId);
+    const tasks = await taskService.getAllTasks(projectId, req.userId);
     res.json(tasks);
   } catch (err) {
     console.error('[Task] getAll:', err.message);

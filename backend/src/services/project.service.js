@@ -1,8 +1,13 @@
 const prisma = require('../prisma/client');
 
-// ─── Lấy tất cả projects (kèm số lượng tasks) ─────────────────────────────────
-async function getAllProjects() {
+// ─── Lấy tất cả projects mà user là thành viên (kèm số lượng tasks) ──────────
+async function getAllProjects(userId) {
   return prisma.project.findMany({
+    where: {
+      members: {
+        some: { id: userId }
+      }
+    },
     include: {
       _count: { select: { tasks: true } },
       members: { select: { id: true, name: true, email: true } },
@@ -24,7 +29,13 @@ async function getProjectById(id) {
 }
 
 // ─── Tạo project mới ──────────────────────────────────────────────────────────
-async function createProject(data) {
+async function createProject(data, creatorId) {
+  const memberIds = data.memberIds || [];
+  // Đảm bảo người tạo luôn là thành viên
+  if (creatorId && !memberIds.includes(creatorId)) {
+    memberIds.push(creatorId);
+  }
+
   return prisma.project.create({
     data: {
       name: data.name.trim(),
@@ -36,9 +47,9 @@ async function createProject(data) {
       completion: data.completion ?? 0,
       blockedBy: data.blockedBy ?? '',
       icon: data.icon ?? '🎯',
-      members: data.memberIds ? {
-        connect: data.memberIds.map(id => ({ id }))
-      } : undefined,
+      members: {
+        connect: memberIds.map(id => ({ id }))
+      },
     },
     include: { members: { select: { id: true, name: true, email: true } } },
   });

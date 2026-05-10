@@ -1,34 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Trash2 } from 'lucide-react';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { CustomDatePicker } from './CustomDatePicker';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { CustomDatePicker } from '../components/common/CustomDatePicker';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Search as SearchIcon, X, UserPlus, CheckCircle2 } from 'lucide-react';
-import { searchUsers, addProjectMember, removeProjectMember, updateTask } from '../../api';
+import { searchUsers, addProjectMember, removeProjectMember, updateTask } from '../api';
 
-interface Task {
-  id: string;
-  title: string;
-  status: 'Not Started' | 'In Progress' | 'Done';
-  projectId: string;
-  assignee?: string;
-  due?: string;
-  priority?: string;
-  summary?: string;
-  icon?: string;
-  assignees?: { id: string; name: string; email: string }[];
-}
-
-interface Project {
-  id: string;
-  name: string;
-  status: string;
-  owner: string;
-  dates: string;
-  icon: string;
-  members?: { id: string; name: string; email: string }[];
-}
+import { type Project, type Task } from '../api';
 
 interface TaskViewProps {
   project: Project;

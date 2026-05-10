@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ProjectList } from './components/ProjectList';
-import { TaskView } from './components/TaskView';
-import { CreateProjectDialog } from './components/CreateProjectDialog';
-import { CreateTaskDialog } from './components/CreateTaskDialog';
-import { Sidebar } from './components/Sidebar';
-import { Home } from './components/Home';
-import { AllTasksView } from './components/AllTasksView';
+import { ProjectList } from '../pages/ProjectList';
+import { TaskView } from '../pages/TaskView';
+import { CreateProjectDialog } from '../components/project/CreateProjectDialog';
+import { CreateTaskDialog } from '../components/task/CreateTaskDialog';
+import { Sidebar } from '../components/common/Sidebar';
+import { Home } from '../pages/Home';
+import { AllTasksView } from '../pages/AllTasksView';
+import { Login } from '../pages/Login';
 import {
   type Project,
   type Task,
@@ -13,13 +14,13 @@ import {
   getTasks,
   createProject,
   updateProject,
+  deleteProject,
   createTask,
   updateTask,
   updateTaskStatus,
   deleteTask,
   getMe,
 } from '../api';
-import { Login } from './components/Login';
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -239,7 +240,15 @@ export default function App() {
         setSelectedProjectId(null);
       }} />
       <div className="flex-1 h-full overflow-y-auto relative bg-[#191919]">
-        {activeTab === 'home' && <Home />}
+        {activeTab === 'home' && (
+          <Home 
+            onSelectProject={(id) => {
+              setSelectedProjectId(id);
+              setActiveTab('projects');
+            }} 
+            onTabChange={setActiveTab} 
+          />
+        )}
 
         {activeTab === 'projects' && (
           selectedProject ? (

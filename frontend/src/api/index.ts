@@ -50,12 +50,18 @@ function getAuthHeaders() {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...getAuthHeaders(),
-    ...(init?.headers || {}),
   };
+
+  if (init?.headers) {
+    const initHeaders = init.headers as Record<string, string>;
+    Object.keys(initHeaders).forEach(key => {
+      headers[key] = initHeaders[key];
+    });
+  }
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,

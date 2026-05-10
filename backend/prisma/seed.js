@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
@@ -8,6 +9,17 @@ async function main() {
   // Xoá dữ liệu cũ
   await prisma.task.deleteMany();
   await prisma.project.deleteMany();
+  await prisma.user.deleteMany();
+
+  // Tạo user mặc định
+  const passwordHash = await bcrypt.hash('password123', 10);
+  const user = await prisma.user.create({
+    data: {
+      name: 'Bình',
+      email: 'binh@example.com',
+      password: passwordHash,
+    },
+  });
 
   // Tạo projects
   const p1 = await prisma.project.create({
@@ -21,6 +33,7 @@ async function main() {
       completion: 0,
       blockedBy: '',
       icon: '📝',
+      members: { connect: { id: user.id } },
     },
   });
 
@@ -35,20 +48,22 @@ async function main() {
       completion: 0,
       blockedBy: '',
       icon: '🌐',
+      members: { connect: { id: user.id } },
     },
   });
 
   const p3 = await prisma.project.create({
     data: {
-      name: 'Bài tập CNXH',
-      description: '',
-      status: 'Planning',
+      name: 'Đồ án Chuyên ngành',
+      description: 'Đồ án quan trọng sắp đến hạn',
+      status: 'In Progress',
       owner: 'Bình',
-      dates: '19 tháng 9, 2025',
-      priority: '',
-      completion: 0,
+      dates: '01 tháng 1, 2026 → 15 tháng 5, 2026',
+      priority: 'High',
+      completion: 45,
       blockedBy: '',
-      icon: '🎯',
+      icon: '🎓',
+      members: { connect: { id: user.id } },
     },
   });
 
@@ -86,7 +101,7 @@ async function main() {
     const done = tasks.filter(t => t.status === 'Done').length;
     const completion = tasks.length > 0
       ? Math.round((done / tasks.length) * 10000) / 100
-      : 0;
+      : p.completion;
     await prisma.project.update({ where: { id: p.id }, data: { completion } });
   }
 
