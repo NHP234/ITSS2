@@ -1,4 +1,5 @@
 import { Target, ListTodo, User, Bell, Settings, Search, Home, LogOut } from 'lucide-react';
+import { NotificationPopover } from './NotificationPopover';
 
 interface SidebarProps {
   activeTab: string;
@@ -17,11 +18,14 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
   return (
     <div className="w-56 h-full bg-[#1e1e1e] border-r border-gray-800 flex flex-col text-gray-300 shrink-0">
-      <div className="p-3 flex items-center gap-2.5 mb-1 cursor-pointer hover:bg-[#2a2a2a] m-1.5 rounded-md transition-colors" onClick={() => onTabChange('home')}>
-        <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center text-white text-sm font-bold shadow-sm">
-          W
+      <div className="p-3 flex items-center justify-between mb-1 m-1.5 rounded-md transition-colors">
+        <div className="flex items-center gap-2.5 cursor-pointer hover:bg-[#2a2a2a] p-1.5 rounded-md transition-colors" onClick={() => onTabChange('home')}>
+          <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            W
+          </div>
+          <span className="font-semibold text-white truncate text-sm">Workspace</span>
         </div>
-        <span className="font-semibold text-white truncate text-sm">My Workspace</span>
+        <NotificationPopover />
       </div>
 
       <div className="px-3 mb-4">

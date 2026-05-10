@@ -1,5 +1,6 @@
 const prisma = require('../prisma/client');
 const { recalculateCompletion } = require('./project.service');
+const notificationService = require('./notification.service');
 
 const VALID_STATUSES = ['Not Started', 'In Progress', 'Done'];
 
@@ -48,6 +49,7 @@ async function createTask(data) {
       priority: data.priority ?? '',
       summary: data.summary ?? '',
       icon: data.icon ?? 'calendar',
+      weight: data.weight !== undefined ? parseFloat(data.weight) : 1,
       assignees: data.assigneeIds ? {
         connect: data.assigneeIds.map(id => ({ id }))
       } : undefined,
@@ -55,6 +57,20 @@ async function createTask(data) {
     include: { assignees: { select: { id: true, name: true, email: true } } },
   });
   await recalculateCompletion(task.projectId);
+
+  // Gửi thông báo cho những người được gán
+  if (data.assigneeIds && data.assigneeIds.length > 0) {
+    for (const userId of data.assigneeIds) {
+      await notificationService.createNotification({
+        userId,
+        type: 'ASSIGNED_TASK',
+        title: 'Bạn được gán nhiệm vụ mới',
+        message: `Bạn đã được gán nhiệm vụ: ${task.title}`,
+        link: `/projects/${task.projectId}`
+      });
+    }
+  }
+
   return task;
 }
 
@@ -68,6 +84,7 @@ async function updateTask(id, data) {
   if (data.priority !== undefined) updateData.priority = data.priority;
   if (data.summary !== undefined)  updateData.summary = data.summary;
   if (data.icon !== undefined)     updateData.icon = data.icon;
+  if (data.weight !== undefined)   updateData.weight = parseFloat(data.weight);
   if (data.assigneeIds !== undefined) {
     updateData.assignees = {
       set: data.assigneeIds.map(id => ({ id }))
@@ -80,6 +97,34 @@ async function updateTask(id, data) {
     include: { assignees: { select: { id: true, name: true, email: true } } },
   });
   await recalculateCompletion(task.projectId);
+
+  // Nếu status thay đổi, thông báo cho tất cả assignees
+  if (data.status !== undefined) {
+    const assignees = task.assignees || [];
+    for (const user of assignees) {
+      await notificationService.createNotification({
+        userId: user.id,
+        type: 'TASK_STATUS_CHANGE',
+        title: 'Trạng thái nhiệm vụ thay đổi',
+        message: `Nhiệm vụ "${task.title}" đã chuyển sang trạng thái: ${task.status}`,
+        link: `/projects/${task.projectId}`
+      });
+    }
+  }
+
+  // Nếu có thêm người mới được gán
+  if (data.assigneeIds !== undefined) {
+    for (const userId of data.assigneeIds) {
+      await notificationService.createNotification({
+        userId,
+        type: 'ASSIGNED_TASK',
+        title: 'Bạn được gán vào nhiệm vụ',
+        message: `Bạn đã được gán vào nhiệm vụ: ${task.title}`,
+        link: `/projects/${task.projectId}`
+      });
+    }
+  }
+
   return task;
 }
 

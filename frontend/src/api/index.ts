@@ -38,9 +38,21 @@ export interface Task {
   priority?: string;
   summary?: string;
   icon?: string;
+  weight?: number;
   createdAt?: string;
   updatedAt?: string;
   assignees?: User[];
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  link?: string;
+  createdAt: string;
 }
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
@@ -70,7 +82,6 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     if (res.status === 401) {
-      // Có thể xử lý logout ở đây nếu muốn
       localStorage.removeItem('token');
     }
     throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -181,6 +192,17 @@ export const updateTaskStatus = (id: string, status: string): Promise<Task> =>
 
 export const deleteTask = (id: string): Promise<void> =>
   request<void>(`/api/tasks/${id}`, { method: 'DELETE' });
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export const getNotifications = (): Promise<Notification[]> =>
+  request<Notification[]>('/api/notifications');
+
+export const markNotificationRead = (id: string): Promise<Notification> =>
+  request<Notification>(`/api/notifications/${id}/read`, { method: 'PATCH' });
+
+export const markAllNotificationsRead = (): Promise<void> =>
+  request<void>('/api/notifications/mark-all-read', { method: 'POST' });
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 

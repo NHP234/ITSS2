@@ -31,6 +31,10 @@ export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, o
     setProjectName(project.name);
   }, [project.name]);
 
+  const totalWeight = tasks.reduce((sum, t) => sum + (t.weight || 1), 0);
+  const doneWeight = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.weight || 1), 0);
+  const localCompletion = totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0;
+
   const handleSearchUsers = async (query: string) => {
     setUserSearch(query);
     if (query.length < 2) {
@@ -137,6 +141,20 @@ export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, o
             >
               <Trash2 className="w-5 h-5" />
             </Button>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="mt-4 flex items-center gap-4">
+            <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-blue-500 transition-all duration-500 ease-out"
+                style={{ width: `${localCompletion}%` }}
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xl font-bold text-white">{localCompletion}%</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Hoàn thành</span>
+            </div>
           </div>
         </div>
 
@@ -404,6 +422,22 @@ export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, o
                               }
                             }}
                           />
+                          <div className="flex items-center gap-1 bg-gray-800/50 px-1.5 py-0.5 rounded border border-gray-700/50">
+                            <span className="text-[10px] text-gray-500 font-medium">Weight</span>
+                            <input 
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={task.weight || 1}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val) && onUpdateTask) {
+                                  onUpdateTask(task.id, { weight: val });
+                                }
+                              }}
+                              className="w-8 bg-transparent text-[10px] text-blue-400 font-bold outline-none border-none p-0 text-center"
+                            />
+                          </div>
                           <div className="flex-1" />
                           <Popover>
                             <PopoverTrigger asChild>

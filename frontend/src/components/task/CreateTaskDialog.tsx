@@ -5,6 +5,7 @@ import { Target, Users, Calendar, ChevronDown, Sparkles, LayoutTemplate, AlignLe
 import { CustomDatePicker } from '../common/CustomDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CheckCircle2, Flag } from 'lucide-react';
+import { searchUsers } from '../../api';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -20,6 +21,30 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
   const [priority, setPriority] = useState('');
   const [due, setDue] = useState('');
   const [summary, setSummary] = useState('');
+  const [weight, setWeight] = useState(1);
+  
+  // Search users state (from main branch)
+  const [userSearch, setUserSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearchUsers = async (query: string) => {
+    setUserSearch(query);
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const results = await searchUsers(query);
+      // Lọc bỏ những người đã là thành viên (nếu cần)
+      setSearchResults(results);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +55,8 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
         assigneeIds,
         priority,
         due,
-        summary
+        summary,
+        weight
       });
       setTitle('Task');
       setStatus('Not Started');
@@ -38,6 +64,7 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
       setPriority('');
       setDue('');
       setSummary('');
+      setWeight(1);
       onClose();
     }
   };
@@ -220,11 +247,19 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
                   </div>
 
                   <div className="flex items-center gap-2 text-gray-400">
-                    <Tag className="w-4 h-4" />
-                    <span>Tags</span>
+                    <ListTodo className="w-4 h-4" />
+                    <span>Weight</span>
                   </div>
-                  <div className="text-gray-400">
-                    Trống
+                  <div>
+                    <input 
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={weight}
+                      onChange={(e) => setWeight(parseFloat(e.target.value) || 1)}
+                      className="bg-transparent border-none outline-none w-full text-blue-400 font-bold text-sm focus:text-blue-300 transition-colors"
+                      placeholder="1"
+                    />
                   </div>
 
                 </div>

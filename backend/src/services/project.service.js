@@ -1,4 +1,5 @@
 const prisma = require('../prisma/client');
+const notificationService = require('./notification.service');
 
 // ─── Lấy tất cả projects mà user là thành viên (kèm số lượng tasks) ──────────
 async function getAllProjects(userId) {
@@ -80,9 +81,20 @@ async function deleteProject(id) {
 // ─── Tính lại completion % sau khi task thay đổi ─────────────────────────────
 async function recalculateCompletion(projectId) {
   const tasks = await prisma.task.findMany({ where: { projectId } });
-  const completion = tasks.length === 0
-    ? 0
-    : Math.round((tasks.filter(t => t.status === 'Done').length / tasks.length) * 10000) / 100;
+  
+  if (tasks.length === 0) {
+    return prisma.project.update({
+      where: { id: projectId },
+      data: { completion: 0 },
+    });
+  }
+
+  const totalWeight = tasks.reduce((sum, task) => sum + (task.weight || 1), 0);
+  const doneWeight = tasks.filter(t => t.status === 'Done').reduce((sum, task) => sum + (task.weight || 1), 0);
+  
+  const completion = totalWeight === 0 
+    ? 0 
+    : Math.round((doneWeight / totalWeight) * 10000) / 100;
 
   return prisma.project.update({
     where: { id: projectId },
@@ -92,11 +104,22 @@ async function recalculateCompletion(projectId) {
 
 // ─── Thêm thành viên ──────────────────────────────────────────────────────────
 async function addMember(projectId, userId) {
-  return prisma.project.update({
+  const result = await prisma.project.update({
     where: { id: projectId },
     data: { members: { connect: { id: userId } } },
     include: { members: { select: { id: true, name: true, email: true } } },
   });
+
+  // Thông báo cho thành viên mới
+  await notificationService.createNotification({
+    userId,
+    type: 'PROJECT_MEMBER_ADD',
+    title: 'Bạn đã được thêm vào dự án mới',
+    message: `Bạn đã được thêm vào dự án: ${result.name}`,
+    link: `/projects/${projectId}`
+  });
+
+  return result;
 }
 
 // ─── Xoá thành viên ───────────────────────────────────────────────────────────

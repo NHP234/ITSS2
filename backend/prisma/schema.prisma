@@ -16,6 +16,7 @@ model User {
   updatedAt DateTime @updatedAt
   memberOfProjects Project[] @relation("ProjectMembers")
   assignedTasks    Task[]    @relation("TaskAssignees")
+  notifications    Notification[]
 }
 
 model Project {
@@ -46,7 +47,20 @@ model Task {
   priority  String   @default("")
   summary   String   @default("")
   icon      String   @default("calendar")
+  weight    Float    @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   assignees User[]   @relation("TaskAssignees")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  link      String?  
+  createdAt DateTime @default(now())
 }
