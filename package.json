@@ -9,8 +9,11 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
     "install:all": "npm install"
+<<<<<<< HEAD
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.60.2"
+=======
+>>>>>>> origin/main
   }
 }
