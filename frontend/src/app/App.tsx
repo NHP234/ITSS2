@@ -6,10 +6,7 @@ import { CreateTaskDialog } from '../components/task/CreateTaskDialog';
 import { Sidebar } from '../components/common/Sidebar';
 import { Home } from '../pages/Home';
 import { AllTasksView } from '../pages/AllTasksView';
-<<<<<<< HEAD
 import { NotificationView } from '../pages/NotificationView';
-=======
->>>>>>> origin/main
 import { Login } from '../pages/Login';
 import {
   type Project,
