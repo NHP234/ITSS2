@@ -5,6 +5,7 @@ import { Target, Users, Calendar, ChevronDown, Sparkles, LayoutTemplate, AlignLe
 import { CustomDatePicker } from '../common/CustomDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CheckCircle2, Flag } from 'lucide-react';
+import { searchUsers } from '../../api';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -21,6 +22,29 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
   const [due, setDue] = useState('');
   const [summary, setSummary] = useState('');
   const [weight, setWeight] = useState(1);
+  
+  // Search users state (from main branch)
+  const [userSearch, setUserSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearchUsers = async (query: string) => {
+    setUserSearch(query);
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const results = await searchUsers(query);
+      // Lọc bỏ những người đã là thành viên (nếu cần)
+      setSearchResults(results);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
