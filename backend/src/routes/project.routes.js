@@ -24,4 +24,10 @@ router.post('/:id/members', project.addMember);
 // DELETE /api/projects/:id/members/:userId
 router.delete('/:id/members/:userId', project.removeMember);
 
+// POST   /api/projects/:id/links
+router.post('/:id/links', project.addLink);
+
+// DELETE /api/projects/:id/links/:linkId
+router.delete('/:id/links/:linkId', project.removeLink);
+
 module.exports = router;

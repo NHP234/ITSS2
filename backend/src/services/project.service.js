@@ -12,6 +12,7 @@ async function getAllProjects(userId) {
     include: {
       _count: { select: { tasks: true } },
       members: { select: { id: true, name: true, email: true } },
+      links: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -25,6 +26,7 @@ async function getProjectById(id) {
       tasks: { orderBy: { createdAt: 'asc' } },
       _count: { select: { tasks: true } },
       members: { select: { id: true, name: true, email: true } },
+      links: true,
     },
   });
 }
@@ -69,7 +71,14 @@ async function updateProject(id, data) {
   if (data.blockedBy !== undefined)   updateData.blockedBy = data.blockedBy;
   if (data.icon !== undefined)        updateData.icon = data.icon;
 
-  return prisma.project.update({ where: { id }, data: updateData });
+  return prisma.project.update({ 
+    where: { id }, 
+    data: updateData,
+    include: {
+      links: true,
+      members: { select: { id: true, name: true, email: true } },
+    }
+  });
 }
 
 // ─── Xoá project (và tất cả tasks) ───────────────────────────────────────────
@@ -131,6 +140,24 @@ async function removeMember(projectId, userId) {
   });
 }
 
+// ─── Thêm Link ────────────────────────────────────────────────────────────────
+async function addLink(projectId, data) {
+  return prisma.projectLink.create({
+    data: {
+      title: data.title,
+      url: data.url,
+      projectId: projectId
+    }
+  });
+}
+
+// ─── Xoá Link ─────────────────────────────────────────────────────────────────
+async function removeLink(linkId) {
+  return prisma.projectLink.delete({
+    where: { id: linkId }
+  });
+}
+
 module.exports = {
   getAllProjects,
   getProjectById,
@@ -140,4 +167,6 @@ module.exports = {
   recalculateCompletion,
   addMember,
   removeMember,
+  addLink,
+  removeLink,
 };

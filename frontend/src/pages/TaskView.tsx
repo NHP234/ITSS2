@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Trash2 } from 'lucide-react';
+import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Trash2, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { CustomDatePicker } from '../components/common/CustomDatePicker';
@@ -19,10 +19,15 @@ interface TaskViewProps {
   onDeleteTask: (taskId: string) => void;
   onUpdateProject?: (projectId: string, updates: Partial<Project>) => void;
   onDeleteProject?: (projectId: string) => void;
+  onAddLink?: (projectId: string, title: string, url: string) => void;
+  onRemoveLink?: (projectId: string, linkId: string) => void;
 }
 
-export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, onDeleteTask, onUpdateProject, onDeleteProject }: TaskViewProps) {
+export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, onDeleteTask, onUpdateProject, onDeleteProject, onAddLink, onRemoveLink }: TaskViewProps) {
   const [projectName, setProjectName] = useState(project.name);
+  const [newLinkTitle, setNewLinkTitle] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [isAddingLink, setIsAddingLink] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -301,11 +306,91 @@ export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, o
           </div>
         </div>
 
-        <div className="space-y-2 pt-4 border-t border-gray-800">
-          <h3 className="text-lg">About this project</h3>
-          <ul className="list-disc list-inside text-sm text-gray-400">
-            <li>Danh sách</li>
-          </ul>
+        <div className="space-y-4 pt-4 border-t border-gray-800">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-200">
+              <LinkIcon className="w-5 h-5 text-blue-400" />
+              Links & Tài liệu
+            </h3>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs text-blue-400 hover:text-blue-300 h-8"
+              onClick={() => setIsAddingLink(!isAddingLink)}
+            >
+              {isAddingLink ? 'Huỷ' : 'Thêm link'}
+            </Button>
+          </div>
+
+          {isAddingLink && (
+            <div className="bg-[#222] border border-gray-700 rounded-lg p-3 space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Tiêu đề</label>
+                <input 
+                  className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+                  placeholder="VD: Repo dự án, Figma..."
+                  value={newLinkTitle}
+                  onChange={(e) => setNewLinkTitle(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">URL</label>
+                <input 
+                  className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+                  placeholder="https://..."
+                  value={newLinkUrl}
+                  onChange={(e) => setNewLinkUrl(e.target.value)}
+                />
+              </div>
+              <Button 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white h-9"
+                disabled={!newLinkTitle || !newLinkUrl}
+                onClick={() => {
+                  if (onAddLink) {
+                    onAddLink(project.id, newLinkTitle, newLinkUrl);
+                    setNewLinkTitle('');
+                    setNewLinkUrl('');
+                    setIsAddingLink(false);
+                  }
+                }}
+              >
+                Lưu liên kết
+              </Button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {project.links && project.links.length > 0 ? (
+              project.links.map(link => (
+                <div key={link.id} className="group flex items-center justify-between bg-[#222] hover:bg-[#2a2a2a] border border-gray-800 rounded-lg p-3 transition-all">
+                  <a 
+                    href={link.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                      <ExternalLink className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-medium text-gray-200 truncate">{link.title}</span>
+                      <span className="text-[10px] text-gray-500 truncate">{link.url}</span>
+                    </div>
+                  </a>
+                  <button 
+                    onClick={() => onRemoveLink?.(project.id, link.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 transition-opacity"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            ) : !isAddingLink && (
+              <div className="col-span-full py-4 text-center border border-dashed border-gray-800 rounded-xl">
+                <p className="text-sm text-gray-500">Chưa có liên kết nào. Thêm các tài liệu liên quan tại đây.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

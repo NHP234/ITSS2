@@ -86,4 +86,28 @@ async function removeMember(req, res) {
   }
 }
 
-module.exports = { getAll, getOne, create, update, remove, addMember, removeMember };
+// POST /api/projects/:id/links
+async function addLink(req, res) {
+  try {
+    const { title, url } = req.body;
+    if (!title || !url) return res.status(400).json({ error: 'Thiếu tiêu đề hoặc URL' });
+    const link = await projectService.addLink(req.params.id, { title, url });
+    res.status(201).json(link);
+  } catch (err) {
+    console.error('[Project] addLink:', err.message);
+    res.status(500).json({ error: 'Không thể thêm link' });
+  }
+}
+
+// DELETE /api/projects/:id/links/:linkId
+async function removeLink(req, res) {
+  try {
+    await projectService.removeLink(req.params.linkId);
+    res.json({ message: 'Đã xoá link' });
+  } catch (err) {
+    console.error('[Project] removeLink:', err.message);
+    res.status(500).json({ error: 'Không thể xoá link' });
+  }
+}
+
+module.exports = { getAll, getOne, create, update, remove, addMember, removeMember, addLink, removeLink };

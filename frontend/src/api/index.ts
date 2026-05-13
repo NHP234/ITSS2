@@ -4,6 +4,14 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+export interface ProjectLink {
+  id: string;
+  title: string;
+  url: string;
+  projectId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface Project {
   id: string;
@@ -20,6 +28,7 @@ export interface Project {
   updatedAt?: string;
   _count?: { tasks: number };
   members?: { id: string; name: string; email: string }[];
+  links?: ProjectLink[];
 }
 
 export interface User {
@@ -159,6 +168,17 @@ export const addProjectMember = (projectId: string, userId: string): Promise<Pro
 
 export const removeProjectMember = (projectId: string, userId: string): Promise<Project> =>
   request<Project>(`/api/projects/${projectId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+
+export const addProjectLink = (projectId: string, data: { title: string; url: string }): Promise<ProjectLink> =>
+  request<ProjectLink>(`/api/projects/${projectId}/links`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const removeProjectLink = (projectId: string, linkId: string): Promise<void> =>
+  request<void>(`/api/projects/${projectId}/links/${linkId}`, {
     method: 'DELETE',
   });
 

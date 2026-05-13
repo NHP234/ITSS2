@@ -112,6 +112,30 @@ export default function App() {
     }
   };
 
+  const handleAddLink = async (projectId: string, title: string, url: string) => {
+    try {
+      const { addProjectLink } = await import('../api');
+      const newLink = await addProjectLink(projectId, { title, url });
+      setProjects(prev => prev.map(p => 
+        p.id === projectId ? { ...p, links: [...(p.links || []), newLink] } : p
+      ));
+    } catch (err) {
+      console.error('Lỗi thêm link:', err);
+    }
+  };
+  
+  const handleRemoveLink = async (projectId: string, linkId: string) => {
+    try {
+      const { removeProjectLink } = await import('../api');
+      await removeProjectLink(projectId, linkId);
+      setProjects(prev => prev.map(p => 
+        p.id === projectId ? { ...p, links: (p.links || []).filter(l => l.id !== linkId) } : p
+      ));
+    } catch (err) {
+      console.error('Lỗi xoá link:', err);
+    }
+  };
+
   // ─── Task handlers ───────────────────────────────────────────────────────────
   const handleCreateTask = (projectId: string, status: string) => {
     setCurrentProjectIdForTask(projectId);
@@ -242,6 +266,8 @@ export default function App() {
               onDeleteTask={handleDeleteTask}
               onUpdateProject={handleUpdateProject}
               onDeleteProject={handleDeleteProject}
+              onAddLink={handleAddLink}
+              onRemoveLink={handleRemoveLink}
             />
           ) : (
             <ProjectList
