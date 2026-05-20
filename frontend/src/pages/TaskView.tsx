@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useMemo } from 'react';
 import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Trash2, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -23,7 +23,7 @@ interface TaskViewProps {
   onRemoveLink?: (projectId: string, linkId: string) => void;
 }
 
-export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, onDeleteTask, onUpdateProject, onDeleteProject, onAddLink, onRemoveLink }: TaskViewProps) {
+export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTaskStatus, onUpdateTask, onDeleteTask, onUpdateProject, onDeleteProject, onAddLink, onRemoveLink }: TaskViewProps) {
   const [projectName, setProjectName] = useState(project.name);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -36,9 +36,12 @@ export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, o
     setProjectName(project.name);
   }, [project.name]);
 
-  const totalWeight = tasks.reduce((sum, t) => sum + (t.weight || 1), 0);
-  const doneWeight = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.weight || 1), 0);
-  const localCompletion = totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0;
+  const { totalWeight, doneWeight, localCompletion } = useMemo(() => {
+    const totalW = tasks.reduce((sum, t) => sum + (t.weight || 1), 0);
+    const doneW = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.weight || 1), 0);
+    const localC = totalW > 0 ? Math.round((doneW / totalW) * 100) : 0;
+    return { totalWeight: totalW, doneWeight: doneW, localCompletion: localC };
+  }, [tasks]);
 
   const handleSearchUsers = async (query: string) => {
     setUserSearch(query);
@@ -120,11 +123,11 @@ export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, o
     }
   };
 
-  const tasksByStatus = {
+  const tasksByStatus = useMemo(() => ({
     'Not Started': tasks.filter(t => t.status === 'Not Started'),
     'In Progress': tasks.filter(t => t.status === 'In Progress'),
     'Done': tasks.filter(t => t.status === 'Done'),
-  };
+  }), [tasks]);
 
   return (
     <div className="min-h-full bg-[#191919] text-white">
@@ -591,4 +594,4 @@ export function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTask, o
       </div>
     </div>
   );
-}
+});

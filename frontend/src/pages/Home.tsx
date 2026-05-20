@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { Target, CheckCircle2, Clock, Zap, TrendingUp, ChevronRight, AlertCircle, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDashboardStats, DashboardStats } from '../api/dashboard';
@@ -8,7 +8,7 @@ interface HomeProps {
   onTabChange: (tab: string) => void;
 }
 
-export function Home({ onSelectProject, onTabChange }: HomeProps) {
+export const Home = memo(function Home({ onSelectProject, onTabChange }: HomeProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -200,4 +200,4 @@ export function Home({ onSelectProject, onTabChange }: HomeProps) {
       </motion.div>
     </div>
   );
-}
+});

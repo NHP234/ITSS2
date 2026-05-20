@@ -76,16 +76,16 @@ export default function App() {
   }, [fetchAll]);
 
   // ─── Project handlers ────────────────────────────────────────────────────────
-  const handleUpdateProject = async (projectId: string, updates: Partial<Project>) => {
+  const handleUpdateProject = useCallback(async (projectId: string, updates: Partial<Project>) => {
     try {
       const updated = await updateProject(projectId, updates);
       setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updated } : p));
     } catch (err) {
       console.error('Lỗi cập nhật dự án:', err);
     }
-  };
+  }, []);
 
-  const handleCreateProject = async (data: any) => {
+  const handleCreateProject = useCallback(async (data: any) => {
     try {
       await createProject({
         ...data,
@@ -101,21 +101,21 @@ export default function App() {
     } catch (err) {
       console.error('Lỗi tạo dự án:', err);
     }
-  };
+  }, [user]);
 
-  const handleDeleteProject = async (projectId: string) => {
+  const handleDeleteProject = useCallback(async (projectId: string) => {
     if (!confirm('Bạn có chắc chắn muốn xoá dự án này và tất cả nhiệm vụ liên quan?')) return;
     try {
       await deleteProject(projectId);
       setProjects(prev => prev.filter(p => p.id !== projectId));
       setTasks(prev => prev.filter(t => t.projectId !== projectId));
-      if (selectedProjectId === projectId) setSelectedProjectId(null);
+      setSelectedProjectId(prev => prev === projectId ? null : prev);
     } catch (err) {
       console.error('Lỗi xoá dự án:', err);
     }
-  };
+  }, []);
 
-  const handleAddLink = async (projectId: string, title: string, url: string) => {
+  const handleAddLink = useCallback(async (projectId: string, title: string, url: string) => {
     try {
       const { addProjectLink } = await import('../api');
       const newLink = await addProjectLink(projectId, { title, url });
@@ -125,9 +125,9 @@ export default function App() {
     } catch (err) {
       console.error('Lỗi thêm link:', err);
     }
-  };
+  }, []);
   
-  const handleRemoveLink = async (projectId: string, linkId: string) => {
+  const handleRemoveLink = useCallback(async (projectId: string, linkId: string) => {
     try {
       const { removeProjectLink } = await import('../api');
       await removeProjectLink(projectId, linkId);
@@ -137,16 +137,16 @@ export default function App() {
     } catch (err) {
       console.error('Lỗi xoá link:', err);
     }
-  };
+  }, []);
 
   // ─── Task handlers ───────────────────────────────────────────────────────────
-  const handleCreateTask = (projectId: string, status: string) => {
+  const handleCreateTask = useCallback((projectId: string, status: string) => {
     setCurrentProjectIdForTask(projectId);
     setCurrentTaskStatus(status);
     setIsCreateTaskOpen(true);
-  };
+  }, []);
 
-  const handleAddTask = async (data: any) => {
+  const handleAddTask = useCallback(async (data: any) => {
     if (!currentProjectIdForTask) return;
     try {
       const newTask = await createTask({
@@ -162,26 +162,24 @@ export default function App() {
     } catch (err) {
       console.error('Lỗi tạo công việc:', err);
     }
-  };
+  }, [currentProjectIdForTask]);
 
-  const handleUpdateTaskStatus = async (taskId: string, status: string) => {
+  const handleUpdateTaskStatus = useCallback(async (taskId: string, status: string) => {
     try {
       const updated = await updateTaskStatus(taskId, status);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: updated.status } : t));
-      const task = tasks.find(t => t.id === taskId);
-      if (task) {
-        const { getProject } = await import('../api');
-        const updatedProject = await getProject(task.projectId);
-        setProjects(prev =>
-          prev.map(p => p.id === task.projectId ? { ...p, completion: updatedProject.completion } : p)
-        );
-      }
+      
+      const { getProject } = await import('../api');
+      const updatedProject = await getProject(updated.projectId);
+      setProjects(prev =>
+        prev.map(p => p.id === updated.projectId ? { ...p, completion: updatedProject.completion } : p)
+      );
     } catch (err) {
       console.error('Lỗi cập nhật trạng thái:', err);
     }
-  };
+  }, []);
 
-  const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
+  const handleUpdateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
     try {
       const updated = await updateTask(taskId, updates);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updated } : t));
@@ -195,24 +193,30 @@ export default function App() {
     } catch (err) {
       console.error('Lỗi cập nhật công việc:', err);
     }
-  };
+  }, []);
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = useCallback(async (taskId: string) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
+      // Find the task before deleting to get its projectId. It's safer to use state callback or keep track, but simpler to use the latest state if we include it in dependencies, or fetch it.
+      // Better yet, just filter it out from the current state.
+      let taskProjectId: string | undefined;
+      setTasks(prev => {
+        const task = prev.find(t => t.id === taskId);
+        if (task) taskProjectId = task.projectId;
+        return prev.filter(t => t.id !== taskId);
+      });
       await deleteTask(taskId);
-      setTasks(prev => prev.filter(t => t.id !== taskId));
-      if (task) {
+      if (taskProjectId) {
         const { getProject } = await import('../api');
-        const updatedProject = await getProject(task.projectId);
+        const updatedProject = await getProject(taskProjectId);
         setProjects(prev =>
-          prev.map(p => p.id === task.projectId ? { ...p, completion: updatedProject.completion } : p)
+          prev.map(p => p.id === taskProjectId ? { ...p, completion: updatedProject.completion } : p)
         );
       }
     } catch (err) {
       console.error('Lỗi xoá công việc:', err);
     }
-  };
+  }, []);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const projectTasks = selectedProjectId

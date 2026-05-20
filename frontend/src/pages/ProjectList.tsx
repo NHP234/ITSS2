@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Plus, CircleDot, ChevronDown, Target, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, LayoutGrid, Calendar, Trash2, X, Check } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -17,7 +17,7 @@ interface ProjectListProps {
   selectedProjectId: string | null;
 }
 
-export function ProjectList({ projects, onSelectProject, onCreateProject, onDeleteProject, selectedProjectId }: ProjectListProps) {
+export const ProjectList = memo(function ProjectList({ projects, onSelectProject, onCreateProject, onDeleteProject, selectedProjectId }: ProjectListProps) {
   const [activeTab, setActiveTab] = useState<'Active' | 'Timeline' | 'Board' | 'All'>('Board');
 
   // Toolbar States
@@ -77,13 +77,15 @@ export function ProjectList({ projects, onSelectProject, onCreateProject, onDele
     return result;
   }, [projects, searchQuery, filterStatuses, filterPriorities, sortBy, sortOrder]);
 
-  const groupedProjects = processedProjects.reduce((acc, project) => {
-    if (!acc[project.status]) {
-      acc[project.status] = [];
-    }
-    acc[project.status].push(project);
-    return acc;
-  }, {} as Record<string, typeof projects>);
+  const groupedProjects = useMemo(() => {
+    return processedProjects.reduce((acc, project) => {
+      if (!acc[project.status]) {
+        acc[project.status] = [];
+      }
+      acc[project.status].push(project);
+      return acc;
+    }, {} as Record<string, typeof projects>);
+  }, [processedProjects]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -720,4 +722,4 @@ export function ProjectList({ projects, onSelectProject, onCreateProject, onDele
       </div>
     </div>
   );
-}
+});

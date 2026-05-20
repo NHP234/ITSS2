@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useMemo } from 'react';
 import { 
   CheckSquare, Target, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, 
   ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2
@@ -18,7 +18,7 @@ interface AllTasksViewProps {
   onSelectProject?: (projectId: string) => void;
 }
 
-export function AllTasksView({ projects, tasks, onUpdateTask, onCreateTask, onDeleteTask, onSelectProject }: AllTasksViewProps) {
+export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpdateTask, onCreateTask, onDeleteTask, onSelectProject }: AllTasksViewProps) {
   const [activeTab, setActiveTab] = useState<'By project' | 'Board' | 'All tasks'>('Board');
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
     projects.reduce((acc, p) => ({ ...acc, [p.id]: true }), {})
@@ -234,13 +234,15 @@ export function AllTasksView({ projects, tasks, onUpdateTask, onCreateTask, onDe
     </div>
   );
 
-  const groupedTasks = tasks.reduce((acc, task) => {
-    if (!acc[task.status]) {
-      acc[task.status] = [];
-    }
-    acc[task.status].push(task);
-    return acc;
-  }, {} as Record<string, typeof tasks>);
+  const groupedTasks = useMemo(() => {
+    return tasks.reduce((acc, task) => {
+      if (!acc[task.status]) {
+        acc[task.status] = [];
+      }
+      acc[task.status].push(task);
+      return acc;
+    }, {} as Record<string, typeof tasks>);
+  }, [tasks]);
 
   const renderBoardView = () => {
     const statuses = ['Not Started', 'In Progress', 'Done'];
@@ -404,4 +406,4 @@ export function AllTasksView({ projects, tasks, onUpdateTask, onCreateTask, onDe
       </div>
     </div>
   );
-}
+});

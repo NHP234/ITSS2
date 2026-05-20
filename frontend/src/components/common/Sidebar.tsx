@@ -1,12 +1,13 @@
 import { Target, ListTodo, User, Bell, Settings, Search, Home, LogOut } from 'lucide-react';
 import { NotificationPopover } from './NotificationPopover';
+import { memo } from 'react';
 
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const navItemClass = (tabId: string) => 
     `w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors shadow-sm ${
       activeTab === tabId 
@@ -84,4 +85,4 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       </div>
     </div>
   );
-}
+});
