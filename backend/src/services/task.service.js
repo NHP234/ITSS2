@@ -56,20 +56,22 @@ async function createTask(data) {
     },
     include: { assignees: { select: { id: true, name: true, email: true } } },
   });
-  await recalculateCompletion(task.projectId);
 
-  // Gửi thông báo cho những người được gán
+  const sideEffects = [recalculateCompletion(task.projectId)];
+
+  // Gửi thông báo cho những người được gán bằng batch insert
   if (data.assigneeIds && data.assigneeIds.length > 0) {
-    for (const userId of data.assigneeIds) {
-      await notificationService.createNotification({
-        userId,
-        type: 'ASSIGNED_TASK',
-        title: 'Bạn được gán nhiệm vụ mới',
-        message: `Bạn đã được gán nhiệm vụ: ${task.title}`,
-        link: `/projects/${task.projectId}`
-      });
-    }
+    const notifications = data.assigneeIds.map(userId => ({
+      userId,
+      type: 'ASSIGNED_TASK',
+      title: 'Bạn được gán nhiệm vụ mới',
+      message: `Bạn đã được gán nhiệm vụ: ${task.title}`,
+      link: `/projects/${task.projectId}`
+    }));
+    sideEffects.push(notificationService.createManyNotifications(notifications));
   }
+
+  await Promise.all(sideEffects);
 
   return task;
 }
@@ -96,34 +98,37 @@ async function updateTask(id, data) {
     data: updateData,
     include: { assignees: { select: { id: true, name: true, email: true } } },
   });
-  await recalculateCompletion(task.projectId);
 
-  // Nếu status thay đổi, thông báo cho tất cả assignees
+  const sideEffects = [recalculateCompletion(task.projectId)];
+
+  // Nếu status thay đổi, thông báo cho tất cả assignees bằng batch insert
   if (data.status !== undefined) {
     const assignees = task.assignees || [];
-    for (const user of assignees) {
-      await notificationService.createNotification({
+    if (assignees.length > 0) {
+      const statusNotifications = assignees.map(user => ({
         userId: user.id,
         type: 'TASK_STATUS_CHANGE',
         title: 'Trạng thái nhiệm vụ thay đổi',
         message: `Nhiệm vụ "${task.title}" đã chuyển sang trạng thái: ${task.status}`,
         link: `/projects/${task.projectId}`
-      });
+      }));
+      sideEffects.push(notificationService.createManyNotifications(statusNotifications));
     }
   }
 
-  // Nếu có thêm người mới được gán
-  if (data.assigneeIds !== undefined) {
-    for (const userId of data.assigneeIds) {
-      await notificationService.createNotification({
-        userId,
-        type: 'ASSIGNED_TASK',
-        title: 'Bạn được gán vào nhiệm vụ',
-        message: `Bạn đã được gán vào nhiệm vụ: ${task.title}`,
-        link: `/projects/${task.projectId}`
-      });
-    }
+  // Nếu có thêm người mới được gán bằng batch insert
+  if (data.assigneeIds !== undefined && data.assigneeIds.length > 0) {
+    const assignNotifications = data.assigneeIds.map(userId => ({
+      userId,
+      type: 'ASSIGNED_TASK',
+      title: 'Bạn được gán vào nhiệm vụ',
+      message: `Bạn đã được gán vào nhiệm vụ: ${task.title}`,
+      link: `/projects/${task.projectId}`
+    }));
+    sideEffects.push(notificationService.createManyNotifications(assignNotifications));
   }
+
+  await Promise.all(sideEffects);
 
   return task;
 }

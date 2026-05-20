@@ -134,14 +134,14 @@ async function addMember(projectId, userId) {
     include: { members: { select: { id: true, name: true, email: true } } },
   });
 
-  // Thông báo cho thành viên mới
-  await notificationService.createNotification({
+  // Thông báo cho thành viên mới (chạy ngầm không block luồng trả về)
+  notificationService.createNotification({
     userId,
     type: 'PROJECT_MEMBER_ADD',
     title: 'Bạn đã được thêm vào dự án mới',
     message: `Bạn đã được thêm vào dự án: ${result.name}`,
     link: `/projects/${projectId}`
-  });
+  }).catch(err => console.error('[Notification] Error:', err.message));
 
   return result;
 }

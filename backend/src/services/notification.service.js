@@ -27,6 +27,23 @@ async function createNotification(data) {
 }
 
 /**
+ * Tạo nhiều thông báo cùng lúc (Batch Insert)
+ */
+async function createManyNotifications(dataArray) {
+  if (!dataArray || dataArray.length === 0) return;
+  return prisma.notification.createMany({
+    data: dataArray.map(data => ({
+      userId: data.userId,
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      link: data.link || null
+    })),
+    skipDuplicates: true
+  });
+}
+
+/**
  * Đánh dấu đã đọc
  */
 async function markAsRead(id) {
@@ -49,6 +66,7 @@ async function markAllAsRead(userId) {
 module.exports = {
   getUserNotifications,
   createNotification,
+  createManyNotifications,
   markAsRead,
   markAllAsRead
 };
