@@ -1,13 +1,20 @@
-import { useState, useEffect, memo, useMemo } from 'react';
-import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Trash2, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { useState, useEffect, memo, useMemo, useRef } from 'react';
+import { 
+  Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, 
+  Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, 
+  Zap, Trash2, Link as LinkIcon, ExternalLink, Flag, TrendingUp, AlertCircle 
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { CustomDatePicker } from '../components/common/CustomDatePicker';
+import { TaskRecommendations } from '../components/common/TaskRecommendations';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Search as SearchIcon, X, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Search as SearchIcon, X, UserPlus, CheckCircle2, Loader2 } from 'lucide-react';
 import { searchUsers, addProjectMember, removeProjectMember, updateTask } from '../api';
 
 import { type Project, type Task } from '../api';
+
+type TaskPriority = "Low" | "Medium" | "High" | "Very High";
 
 interface TaskViewProps {
   project: Project;
@@ -23,7 +30,78 @@ interface TaskViewProps {
   onRemoveLink?: (projectId: string, linkId: string) => void;
 }
 
-export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTaskStatus, onUpdateTask, onDeleteTask, onUpdateProject, onDeleteProject, onAddLink, onRemoveLink }: TaskViewProps) {
+// Helper functions to convert weight back to priority and difficulty
+const getPriorityFromWeight = (weight: number): string => {
+  if (weight <= 3) return 'Low';
+  if (weight <= 5) return 'Medium';
+  if (weight <= 8) return 'High';
+  return 'Very High';
+};
+
+const getDifficultyFromWeight = (weight: number): string => {
+  if (weight <= 3) return 'Easy';
+  if (weight <= 5) return 'Medium';
+  if (weight <= 8) return 'Hard';
+  return 'Very Hard';
+};
+
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'Very High': return 'text-red-400 bg-red-500/10 border-red-500/30';
+    case 'High': return 'text-orange-400 bg-orange-500/10 border-orange-500/30';
+    case 'Medium': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30';
+    case 'Low': return 'text-green-400 bg-green-500/10 border-green-500/30';
+    default: return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+  }
+};
+
+const getDifficultyColor = (difficulty: string) => {
+  switch (difficulty) {
+    case 'Very Hard': return 'text-red-400 bg-red-500/10 border-red-500/30';
+    case 'Hard': return 'text-orange-400 bg-orange-500/10 border-orange-500/30';
+    case 'Medium': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30';
+    case 'Easy': return 'text-green-400 bg-green-500/10 border-green-500/30';
+    default: return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+  }
+};
+
+// Helper function to check if a task is overdue
+const isTaskOverdue = (dueDateStr?: string): boolean => {
+  if (!dueDateStr) return false;
+  
+  // Parse date string format: "27 tháng 5, 2026" -> Date
+  const dateMatch = dueDateStr.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/);
+  let dueDate;
+  
+  if (dateMatch) {
+    const day = parseInt(dateMatch[1], 10);
+    const month = parseInt(dateMatch[2], 10);
+    const year = parseInt(dateMatch[3], 10);
+    dueDate = new Date(year, month - 1, day);
+  } else {
+    dueDate = new Date(dueDateStr);
+  }
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+  
+  return dueDate < today;
+};
+
+export const TaskView = memo(function TaskView({ 
+  project, 
+  tasks, 
+  onBack, 
+  onCreateTask, 
+  onUpdateTaskStatus, 
+  onUpdateTask, 
+  onDeleteTask, 
+  onUpdateProject, 
+  onDeleteProject, 
+  onAddLink, 
+  onRemoveLink 
+}: TaskViewProps) {
   const [projectName, setProjectName] = useState(project.name);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -31,10 +109,21 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
   const [userSearch, setUserSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setProjectName(project.name);
   }, [project.name]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const { totalWeight, doneWeight, localCompletion } = useMemo(() => {
     const totalW = tasks.reduce((sum, t) => sum + (t.weight || 1), 0);
@@ -52,7 +141,7 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
     setIsSearching(true);
     try {
       const results = await searchUsers(query);
-      // Lọc bỏ những người đã là thành viên
+      // Filter out users already in project
       const filtered = results.filter(u => !project.members?.some(m => m.id === u.id));
       setSearchResults(filtered);
     } catch (err) {
@@ -105,22 +194,89 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
     }
   };
 
+  const handleUpdatePriority = async (taskId: string, newPriority: TaskPriority) => {
+    if (!onUpdateTask) return;
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    const priorityWeightMap: Record<TaskPriority, number> = { 
+      Low: 2, 
+      Medium: 4, 
+      High: 7, 
+      'Very High': 10 
+    };
+    const priorityWeight = priorityWeightMap[newPriority];
+    const difficultyWeightMap: Record<string, number> = { Easy: 2, Medium: 4, Hard: 7, 'Very Hard': 10 };
+    const currentDifficulty = getDifficultyFromWeight(task.weight || 4);
+    const difficultyWeight = difficultyWeightMap[currentDifficulty] || 4;
+    const newWeight = Math.round((priorityWeight + difficultyWeight) / 2);
+    
+    await onUpdateTask(taskId, { 
+      priority: newPriority, 
+      weight: newWeight 
+    });
+  };
+
+  const handleUpdateDifficulty = async (taskId: string, newDifficulty: string) => {
+    if (!onUpdateTask) return;
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    // Calculate new weight based on current priority and new difficulty
+    const currentPriority = task.priority || 'Medium';
+    const priorityWeightMap: Record<string, number> = { Low: 2, Medium: 4, High: 7, 'Very High': 10 };
+    const priorityWeight = priorityWeightMap[currentPriority] || 4;
+    const difficultyWeightMap: Record<string, number> = { Easy: 2, Medium: 4, Hard: 7, 'Very Hard': 10 };
+    const difficultyWeight = difficultyWeightMap[newDifficulty] || 4;
+    const newWeight = Math.round((priorityWeight + difficultyWeight) / 2);
+    
+    await onUpdateTask(taskId, { difficulty: newDifficulty, weight: newWeight } as any);
+  };
+
   const handleNameBlur = () => {
     if (projectName.trim() !== project.name && onUpdateProject) {
       onUpdateProject(project.id, { name: projectName });
     }
   };
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Planning':
-        return 'bg-blue-600';
-      case 'In Progress':
-        return 'bg-yellow-600';
-      case 'Done':
-        return 'bg-green-600';
-      default:
-        return 'bg-gray-600';
+
+  // Hover handlers with debounce to prevent flashing
+  const handleTaskMouseEnter = (taskId: string) => {
+    // Clear any pending hide
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
     }
+    
+    // Small delay to check if it's an overdue task before showing popup
+    setTimeout(() => {
+      const task = tasks.find(t => t.id === taskId);
+      // Only show popup if task exists and is overdue
+      if (task && isTaskOverdue(task.due)) {
+        setHoveredTaskId(taskId);
+      }
+    }, 100);
+  };
+
+  const handleTaskMouseLeave = (taskId: string) => {
+    // Delay hiding to allow moving to popup
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (hoveredTaskId === taskId) {
+        setHoveredTaskId(null);
+      }
+    }, 200);
+  };
+
+  const handlePopupMouseEnter = (taskId: string) => {
+    // Cancel hide when mouse enters popup
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const handlePopupMouseLeave = (taskId: string) => {
+    // Hide popup when mouse leaves
+    setHoveredTaskId(null);
   };
 
   const tasksByStatus = useMemo(() => ({
@@ -128,6 +284,10 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
     'In Progress': tasks.filter(t => t.status === 'In Progress'),
     'Done': tasks.filter(t => t.status === 'Done'),
   }), [tasks]);
+
+  // Priority and difficulty options for dropdowns
+  const priorityOptions: TaskPriority[] = ['Low', 'Medium', 'High', 'Very High'];
+  const difficultyOptions = ['Easy', 'Medium', 'Hard', 'Very Hard'];
 
   return (
     <div className="min-h-full bg-[#191919] text-white">
@@ -199,56 +359,77 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
                     <UserPlus className="w-4 h-4" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 bg-[#1e1e1e] border-[#333] p-0 shadow-2xl rounded-xl">
+                <PopoverContent className="w-80 sm:w-96 bg-[#1e1e1e] border-[#333] p-0 shadow-2xl rounded-xl z-50">
                   <div className="p-3 border-b border-gray-800">
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Thành viên dự án</h4>
                   </div>
-                  <div className="max-h-48 overflow-y-auto p-1">
-                    {project.members?.map(m => (
-                      <div key={m.id} className="flex items-center justify-between p-2 hover:bg-gray-800 rounded group transition-colors">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
-                            {m.name.charAt(0).toUpperCase()}
+                  
+                  <div className="max-h-64 overflow-y-auto p-2">
+                    {project.members && project.members.length > 0 ? (
+                      <div className="space-y-1">
+                        {project.members.map(m => (
+                          <div key={m.id} className="flex items-center justify-between p-2 hover:bg-gray-800 rounded group transition-colors">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                                {m.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <span className="text-sm font-medium text-gray-200 truncate">{m.name}</span>
+                                <span className="text-xs text-gray-500 truncate">{m.email}</span>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => handleRemoveMember(m.id)} 
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 transition-all flex-shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-medium text-gray-200">{m.name}</span>
-                            <span className="text-[10px] text-gray-500">{m.email}</span>
-                          </div>
-                        </div>
-                        <button onClick={() => handleRemoveMember(m.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400">
-                          <X className="w-3 h-3" />
-                        </button>
+                        ))}
                       </div>
-                    ))}
-                    {(!project.members || project.members.length === 0) && (
-                      <div className="p-4 text-center text-xs text-gray-500 italic">Chưa có thành viên nào</div>
+                    ) : (
+                      <div className="p-6 text-center">
+                        <Users className="w-10 h-10 text-gray-600 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Chưa có thành viên nào</p>
+                      </div>
                     )}
                   </div>
-                  <div className="p-2 border-t border-gray-800 bg-[#252525]/30">
+                  
+                  <div className="p-3 border-t border-gray-800 bg-[#252525]/30">
                     <div className="relative">
-                      <SearchIcon className="absolute left-2 top-2 w-3 h-3 text-gray-500" />
+                      <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                       <input 
-                        className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md py-1.5 pl-7 pr-2 text-xs outline-none focus:border-blue-500"
+                        className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600"
                         placeholder="Tìm theo email hoặc tên..."
                         value={userSearch}
                         onChange={(e) => handleSearchUsers(e.target.value)}
                       />
                     </div>
+                    
                     {searchResults.length > 0 && (
-                      <div className="mt-2 space-y-1">
+                      <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
                         {searchResults.map(u => (
                           <button 
                             key={u.id} 
                             onClick={() => handleAddMember(u.id)}
-                            className="w-full flex items-center gap-2 p-1.5 hover:bg-blue-600 rounded text-left transition-colors"
+                            className="w-full flex items-center gap-3 p-2 hover:bg-blue-600 rounded-lg transition-colors text-left"
                           >
-                            <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center text-[9px]">{u.name.charAt(0).toUpperCase()}</div>
-                            <div className="flex flex-col">
-                              <span className="text-xs">{u.name}</span>
-                              <span className="text-[10px] opacity-70">{u.email}</span>
+                            <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {u.name.charAt(0).toUpperCase()}
                             </div>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <span className="text-sm font-medium text-gray-200 truncate">{u.name}</span>
+                              <span className="text-xs text-gray-400 truncate">{u.email}</span>
+                            </div>
+                            <UserPlus className="w-4 h-4 text-gray-400 flex-shrink-0" />
                           </button>
                         ))}
+                      </div>
+                    )}
+                    
+                    {isSearching && (
+                      <div className="mt-2 flex justify-center py-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
                       </div>
                     )}
                   </div>
@@ -475,104 +656,195 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
                   </div>
 
                   <div className="space-y-2 flex-1">
-                    {statusTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="bg-[#1a1a1a] rounded-lg p-3 text-sm hover:bg-[#252525] shadow-sm border border-gray-800/50 focus-within:ring-1 focus-within:ring-gray-600 transition-shadow space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <input
-                            value={task.title}
-                            onChange={(e) => onUpdateTask?.(task.id, { title: e.target.value })}
-                            className="bg-transparent border-none outline-none flex-1 text-white cursor-text font-medium"
-                          />
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-gray-600 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all"
-                            onClick={() => onDeleteTask(task.id)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CustomDatePicker 
-                            trigger={
-                              <button className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 transition-colors">
-                                <Calendar className="w-3 h-3" />
-                                {task.due || 'Thêm ngày'}
-                              </button>
+                    {statusTasks.map((task) => {
+                      const taskPriority = task.priority || getPriorityFromWeight(task.weight || 4);
+                      const taskDifficulty = getDifficultyFromWeight(task.weight || 4);
+                      const isOverdue = isTaskOverdue(task.due) && task.status !== 'Done';
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          className="relative group"
+                          onMouseEnter={() => handleTaskMouseEnter(task.id)}
+                          onMouseLeave={() => handleTaskMouseLeave(task.id)}
+                        >
+                          <div className={`
+                            rounded-lg p-3 text-sm hover:bg-[#252525] shadow-sm border transition-all duration-200 space-y-2
+                            ${isOverdue 
+                              ? 'bg-red-950/30 border-red-500/50 shadow-red-500/20 hover:bg-red-950/40' 
+                              : 'bg-[#1a1a1a] border-gray-800/50 hover:bg-[#252525]'
                             }
-                            onSelect={(date) => {
-                              if (date && onUpdateTask) {
-                                const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
-                                onUpdateTask(task.id, { due: formattedDate });
-                              }
-                            }}
-                          />
-                          <div className="flex items-center gap-1 bg-gray-800/50 px-1.5 py-0.5 rounded border border-gray-700/50">
-                            <span className="text-[10px] text-gray-500 font-medium">Weight</span>
-                            <input 
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={task.weight || 1}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                if (!isNaN(val) && onUpdateTask) {
-                                  onUpdateTask(task.id, { weight: val });
-                                }
-                              }}
-                              className="w-8 bg-transparent text-[10px] text-blue-400 font-bold outline-none border-none p-0 text-center"
-                            />
-                          </div>
-                          <div className="flex-1" />
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button className="flex -space-x-1 hover:bg-gray-800 p-0.5 rounded transition-colors">
-                                {task.assignees && task.assignees.length > 0 ? (
-                                  task.assignees.map(a => (
-                                    <div key={a.id} className="w-5 h-5 rounded-full bg-blue-600 border border-[#1a1a1a] flex items-center justify-center text-[8px] font-bold" title={a.name}>
-                                      {a.name.charAt(0).toUpperCase()}
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="w-5 h-5 rounded-full border border-dashed border-gray-600 flex items-center justify-center text-gray-500">
-                                    <Users className="w-3 h-3" />
-                                  </div>
-                                )}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
-                              <div className="p-2 border-b border-gray-800 mb-1">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">Gán cho...</span>
-                              </div>
-                              {project.members?.map(m => {
-                                const isAssigned = task.assignees?.some(a => a.id === m.id);
-                                return (
-                                  <button 
-                                    key={m.id} 
-                                    onClick={() => handleToggleAssignee(task.id, m.id, !!isAssigned)}
-                                    className="w-full flex items-center justify-between p-2 hover:bg-gray-800 rounded transition-colors group"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
-                                        {m.name.charAt(0).toUpperCase()}
-                                      </div>
-                                      <span className="text-xs text-gray-300">{m.name}</span>
-                                    </div>
-                                    {isAssigned && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
+                            ${isOverdue && 'animate-pulse-glow'}
+                          `}>
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                value={task.title}
+                                onChange={(e) => onUpdateTask?.(task.id, { title: e.target.value })}
+                                className={`bg-transparent border-none outline-none flex-1 cursor-text font-medium ${
+                                  isOverdue ? 'text-red-200' : 'text-white'
+                                }`}
+                              />
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-gray-600 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all"
+                                onClick={() => onDeleteTask(task.id)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {/* Priority Dropdown */}
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPriorityColor(taskPriority)}`}>
+                                    <Flag className="w-3 h-3" />
+                                    {taskPriority}
+                                    <ChevronDown className="w-3 h-3" />
                                   </button>
-                                );
-                              })}
-                              {(!project.members || project.members.length === 0) && (
-                                <div className="p-3 text-[10px] text-gray-500 text-center italic">Hãy thêm thành viên vào dự án trước</div>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-32 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-lg z-50">
+                                  {priorityOptions.map(p => (
+                                    <button
+                                      key={p}
+                                      type="button"
+                                      onClick={() => handleUpdatePriority(task.id, p)}
+                                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                                        p === taskPriority ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-800'
+                                      }`}
+                                    >
+                                      {p}
+                                    </button>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+
+                              {/* Difficulty Dropdown */}
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${getDifficultyColor(taskDifficulty)}`}>
+                                    <TrendingUp className="w-3 h-3" />
+                                    {taskDifficulty}
+                                    <ChevronDown className="w-3 h-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-32 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-lg z-50">
+                                  {difficultyOptions.map(d => (
+                                    <button
+                                      key={d}
+                                      type="button"
+                                      onClick={() => handleUpdateDifficulty(task.id, d)}
+                                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                                        d === taskDifficulty ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-800'
+                                      }`}
+                                    >
+                                      {d}
+                                    </button>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+
+                              <CustomDatePicker 
+                                trigger={
+                                  <button className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+                                    isOverdue ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-gray-300'
+                                  }`}>
+                                    <Calendar className="w-3 h-3" />
+                                    {task.due || 'Thêm ngày'}
+                                  </button>
+                                }
+                                onSelect={(date) => {
+                                  if (date && onUpdateTask) {
+                                    const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+                                    onUpdateTask(task.id, { due: formattedDate });
+                                  }
+                                }}
+                              />
+                              
+                              {isOverdue && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500/30 text-red-300 border border-red-500/50">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Quá hạn
+                                </span>
                               )}
-                            </PopoverContent>
-                          </Popover>
+                              
+                              <div className="flex-1" />
+                              
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="flex -space-x-1 hover:bg-gray-800 p-0.5 rounded transition-colors">
+                                    {task.assignees && task.assignees.length > 0 ? (
+                                      task.assignees.map(a => (
+                                        <div key={a.id} className="w-5 h-5 rounded-full bg-blue-600 border border-[#1a1a1a] flex items-center justify-center text-[8px] font-bold" title={a.name}>
+                                          {a.name.charAt(0).toUpperCase()}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="w-5 h-5 rounded-full border border-dashed border-gray-600 flex items-center justify-center text-gray-500">
+                                        <Users className="w-3 h-3" />
+                                      </div>
+                                    )}
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl z-50">
+                                  <div className="p-2 border-b border-gray-800 mb-1">
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase">Gán cho...</span>
+                                  </div>
+                                  {project.members?.map(m => {
+                                    const isAssigned = task.assignees?.some(a => a.id === m.id);
+                                    return (
+                                      <button 
+                                        key={m.id} 
+                                        type="button"
+                                        onClick={() => handleToggleAssignee(task.id, m.id, !!isAssigned)}
+                                        className="w-full flex items-center justify-between p-2 hover:bg-gray-800 rounded transition-colors group"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
+                                            {m.name.charAt(0).toUpperCase()}
+                                          </div>
+                                          <span className="text-xs text-gray-300">{m.name}</span>
+                                        </div>
+                                        {isAssigned && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
+                                      </button>
+                                    );
+                                  })}
+                                  {(!project.members || project.members.length === 0) && (
+                                    <div className="p-3 text-[10px] text-gray-500 text-center italic">Hãy thêm thành viên vào dự án trước</div>
+                                  )}
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+
+                          {/* Show recommendations on hover - only for overdue tasks */}
+                          {hoveredTaskId === task.id && isOverdue && (
+                            <div 
+                              className="absolute left-1/2 transform -translate-x-1/2 z-[100]"
+                              style={{ 
+                                bottom: '100%',
+                                marginBottom: '8px',
+                                minWidth: 'min(320px, 90vw)',
+                                maxWidth: '90vw'
+                              }}
+                              onMouseEnter={() => handlePopupMouseEnter(task.id)}
+                              onMouseLeave={() => handlePopupMouseLeave(task.id)}
+                            >
+                              {/* Small arrow pointing to task */}
+                              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+                                <div className="w-3 h-3 bg-[#2a2a2a] rotate-45 border-r border-b border-gray-600"></div>
+                              </div>
+                              <TaskRecommendations 
+                                taskId={task.id} 
+                                taskTitle={task.title}
+                                onClose={() => setHoveredTaskId(null)}
+                              />
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     <button
                       onClick={() => onCreateTask(project.id, status)}

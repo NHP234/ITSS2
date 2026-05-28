@@ -82,4 +82,18 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { getAll, getOne, create, update, updateStatus, remove };
+// GET /api/tasks/:id/recommendations
+async function getRecommendations(req, res) {
+  try {
+    const recommendations = await taskService.getTaskRecommendations(req.params.id);
+    res.json(recommendations);
+  } catch (err) {
+    console.error('[Task] getRecommendations:', err.message);
+    if (err.message.includes('Không tìm thấy')) {
+      return res.status(404).json({ error: 'Không tìm thấy công việc' });
+    }
+    res.status(500).json({ error: 'Không thể lấy gợi ý' });
+  }
+}
+
+module.exports = { getAll, getOne, create, update, updateStatus, remove, getRecommendations };

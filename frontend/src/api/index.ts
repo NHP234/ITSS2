@@ -1,7 +1,7 @@
 // ─── API Service Layer ────────────────────────────────────────────────────────
 // Tập trung tất cả HTTP calls đến backend Express server
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const API_BASE = (import.meta.env as any).VITE_API_URL ?? 'http://localhost:3001';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface ProjectLink {
@@ -44,10 +44,10 @@ export interface Task {
   projectId: string;
   assignee?: string;
   due?: string;
-  priority?: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Very High';
   summary?: string;
   icon?: string;
-  weight?: number;
+  weight?: number; // Combined complexity score (2-10)
   createdAt?: string;
   updatedAt?: string;
   assignees?: User[];
@@ -64,6 +64,32 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface TaskRecommendationsResponse {
+  task: { 
+    id: string; 
+    title: string; 
+    status?: string;
+    priority?: string;
+    weight?: number;
+    complexityLevel?: string;
+  };
+  isOverdue: boolean;
+  daysOverdue?: number;
+  currentTaskWeight?: number;
+  recommendations: TaskRecommendation[];
+}
+
+export interface TaskRecommendation {
+  id: string;
+  name: string;
+  email: string;
+  completedTasks: number;
+  avgWeight: string;
+  experienceBonus: number;
+  availabilityScore: number;
+  canHandleCurrentTask: boolean;
+}
+
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
 function getAuthHeaders() {
@@ -72,10 +98,15 @@ function getAuthHeaders() {
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const authHeaders = getAuthHeaders();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
+
+  // Only add Authorization header if it exists
+  if (authHeaders['Authorization']) {
+    headers['Authorization'] = authHeaders['Authorization'];
+  }
 
   if (init?.headers) {
     const initHeaders = init.headers as Record<string, string>;
@@ -212,6 +243,24 @@ export const updateTaskStatus = (id: string, status: string): Promise<Task> =>
 
 export const deleteTask = (id: string): Promise<void> =>
   request<void>(`/api/tasks/${id}`, { method: 'DELETE' });
+
+export interface TaskRecommendation {
+  id: string;
+  name: string;
+  email: string;
+  completedTasks: number;
+  availabilityScore: number;
+}
+
+export interface TaskRecommendationsResponse {
+  task: { id: string; title: string; status?: string };
+  isOverdue: boolean;
+  daysOverdue?: number;
+  recommendations: TaskRecommendation[];
+}
+
+export const getTaskRecommendations = (taskId: string): Promise<TaskRecommendationsResponse> =>
+  request<TaskRecommendationsResponse>(`/api/tasks/${taskId}/recommendations`);
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
