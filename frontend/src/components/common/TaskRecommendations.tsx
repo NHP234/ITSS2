@@ -77,6 +77,7 @@ export function TaskRecommendations({ taskId, taskTitle, onClose, position = 'to
 
   if (!data || !data.isOverdue) return null;
 
+  // Normalize score to be out of 10 (assuming original is 0-10 or 0-100)
   const normalizeScore = (score: number): number => {
     if (score > 10) return Math.min(score / 10, 10);
     return score;
@@ -96,7 +97,7 @@ export function TaskRecommendations({ taskId, taskTitle, onClose, position = 'to
     return 'bg-orange-500/10 border-orange-500/30';
   };
 
-  const getReadinessLevel = (score: number) => {
+  const getScoreLabel = (score: number) => {
     const normalized = normalizeScore(score);
     if (normalized >= 7) return 'Rất sẵn sàng';
     if (normalized >= 4) return 'Có thể hỗ trợ';
@@ -172,11 +173,11 @@ export function TaskRecommendations({ taskId, taskTitle, onClose, position = 'to
                       <p className="text-[9px] text-gray-500 truncate">{person.email}</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-xs font-bold ${getScoreColor(person.availabilityScore)}`}>
-                        {getReadinessLevel(person.availabilityScore)}
+                      <p className={`text-base font-bold ${getScoreColor(person.availabilityScore)}`}>
+                        {normalizedScore.toFixed(1)}/10
                       </p>
-                      <p className="text-[8px] text-gray-500">
-                        Độ sẵn sàng: {normalizedScore.toFixed(1)}
+                      <p className={`text-[8px] font-medium ${getScoreColor(person.availabilityScore)}`}>
+                        {getScoreLabel(person.availabilityScore)}
                       </p>
                     </div>
                   </div>
