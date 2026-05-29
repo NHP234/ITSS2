@@ -1,7 +1,7 @@
 // ─── API Service Layer ────────────────────────────────────────────────────────
 // Tập trung tất cả HTTP calls đến backend Express server
 
-const API_BASE = (import.meta.env as any).VITE_API_URL ?? 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface ProjectLink {
