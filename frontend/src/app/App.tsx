@@ -94,7 +94,7 @@ export default function App() {
         priority: '',
         completion: 0,
         blockedBy: '',
-        icon: '🎯',
+        icon: data.icon || '🎯',
       });
       const projectsData = await getProjects();
       setProjects(projectsData);
