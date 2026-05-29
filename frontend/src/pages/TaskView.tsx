@@ -270,7 +270,7 @@ export const TaskView = memo(function TaskView({
         newProgress[task.id] = savedProgress[task.id];
       } else if (task.status === 'Done') {
         newProgress[task.id] = 100;
-      } else if (taskProgress[task.id] !== undefined && task.status !== 'Done') {
+      } else if (taskProgress[task.id] !== undefined) {
         newProgress[task.id] = taskProgress[task.id];
       } else {
         newProgress[task.id] = (task as any).progress || 0;
