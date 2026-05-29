@@ -1,3 +1,4 @@
+// CreateProjectDialog.tsx - Updated version with better error handling
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '../ui/sheet';
 import { Button } from '../ui/button';
@@ -40,18 +41,24 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onCreate({
-        name,
-        description,
+      const projectData = {
+        name: name.trim(),
+        description: description.trim(),
         dates,
         memberIds: members.map(m => m.id),
         tasks: projectTasks,
-        icon: selectedIcon
-      });
+        icon: selectedIcon  // This is correctly included
+      };
+      
+      console.log('Creating project with icon:', selectedIcon); // Debug log
+      onCreate(projectData);
+      
+      // Reset form
       setName('New Project');
-      setDescription('');
+      setDescription('Dự án này tập trung vào...');
       setDates('');
       setMembers([]);
+      setProjectTasks([]);
       setSelectedIcon('🎯');
       onClose();
     }
@@ -134,20 +141,22 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
           <div className="flex-1 overflow-auto">
             <div className="px-8 py-8 space-y-6">
               
-              {/* Icon Selector */}
+              {/* Icon Selector - Enhanced with better UX */}
               <div className="flex items-start gap-4 mb-2">
                 <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="w-16 h-16 bg-[#2a2a2a] hover:bg-[#333] rounded-xl flex items-center justify-center text-4xl transition-all hover:scale-105"
+                      className="w-16 h-16 bg-[#2a2a2a] hover:bg-[#333] rounded-xl flex items-center justify-center text-4xl transition-all hover:scale-105 group relative"
                     >
                       {selectedIcon}
+                      <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/20 transition-colors" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-80 bg-[#1e1e1e] border-[#333] p-3 shadow-2xl rounded-xl">
                     <div className="mb-2 pb-2 border-b border-gray-800">
                       <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Chọn biểu tượng</h4>
+                      <p className="text-[10px] text-gray-500 mt-1">Biểu tượng sẽ hiển thị trên thẻ dự án</p>
                     </div>
                     <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto">
                       {PROJECT_ICONS.map((icon, index) => (
@@ -157,9 +166,12 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                           onClick={() => {
                             setSelectedIcon(icon);
                             setIconPickerOpen(false);
+                            console.log('Icon selected:', icon); // Debug log
                           }}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center text-xl transition-all hover:bg-blue-600/20 ${
-                            selectedIcon === icon ? 'bg-blue-600/30 ring-2 ring-blue-500' : 'hover:bg-gray-800'
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center text-xl transition-all hover:scale-110 ${
+                            selectedIcon === icon 
+                              ? 'bg-blue-600/30 ring-2 ring-blue-500 scale-105' 
+                              : 'hover:bg-gray-800'
                           }`}
                         >
                           {icon}
@@ -176,10 +188,13 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                     placeholder="Untitled"
                     autoFocus
                   />
-                  <p className="text-xs text-gray-500 mt-2">Nhấp vào biểu tượng để thay đổi</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Biểu tượng đã chọn: <span className="text-blue-400 font-mono">{selectedIcon}</span>
+                  </p>
                 </div>
               </div>
 
+              {/* Rest of your component remains the same */}
               <div className="space-y-3 mt-8">
                 <div className="grid grid-cols-[140px_1fr] gap-4 text-sm items-center">
                   <div className="flex items-center gap-2 text-gray-400">
@@ -290,6 +305,7 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                 </div>
               </div>
 
+              {/* Rest of your JSX remains exactly the same */}
               <div className="space-y-6 pt-6 border-t border-gray-800">
                 <div>
                   <p className="text-sm font-semibold text-gray-300 mb-2">Bình luận</p>

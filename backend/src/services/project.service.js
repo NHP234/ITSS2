@@ -78,7 +78,7 @@ async function createProject(data, creatorId) {
       priority: data.priority ?? '',
       completion: data.completion ?? 0,
       blockedBy: data.blockedBy ?? '',
-      icon: data.icon ?? '🎯',
+      icon: data.icon ?? '🎯',  // ✅ This is correct
       members: {
         connect: memberIds.map(id => ({ id }))
       },
