@@ -37,20 +37,24 @@ export interface User {
   email: string;
 }
 
+export type TaskStatus = 'Not Started' | 'In Progress' | 'Reviewing' | 'Done';
+export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Very High' | '';
+
 export interface Task {
   id: string;
   title: string;
-  status: 'Not Started' | 'In Progress' | 'Done';
+  status: TaskStatus;
   projectId: string;
   assignee?: string;
   due?: string;
-  priority?: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Very High';
   summary?: string;
   icon?: string;
-  weight?: number;
+  weight?: number; // Combined complexity score (2-10)
   createdAt?: string;
   updatedAt?: string;
   assignees?: User[];
+  project?: { id: string; name: string; icon: string };
 }
 
 export interface Notification {
@@ -64,6 +68,32 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface TaskRecommendationsResponse {
+  task: { 
+    id: string; 
+    title: string; 
+    status?: string;
+    priority?: string;
+    weight?: number;
+    complexityLevel?: string;
+  };
+  isOverdue: boolean;
+  daysOverdue?: number;
+  currentTaskWeight?: number;
+  recommendations: TaskRecommendation[];
+}
+
+export interface TaskRecommendation {
+  id: string;
+  name: string;
+  email: string;
+  completedTasks: number;
+  avgWeight: string;
+  experienceBonus: number;
+  availabilityScore: number;
+  canHandleCurrentTask: boolean;
+}
+
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
 function getAuthHeaders() {
@@ -72,10 +102,15 @@ function getAuthHeaders() {
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const authHeaders = getAuthHeaders();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
+
+  // Only add Authorization header if it exists
+  if (authHeaders['Authorization']) {
+    headers['Authorization'] = authHeaders['Authorization'];
+  }
 
   if (init?.headers) {
     const initHeaders = init.headers as Record<string, string>;
@@ -192,6 +227,9 @@ export const getTasks = (projectId?: string): Promise<Task[]> => {
 export const getProjectTasks = (projectId: string): Promise<Task[]> =>
   request<Task[]>(`/api/projects/${projectId}/tasks`);
 
+export const getOverdueTasks = (): Promise<Task[]> =>
+  request<Task[]>('/api/tasks/overdue');
+
 export const createTask = (data: Partial<Task>): Promise<Task> =>
   request<Task>('/api/tasks', {
     method: 'POST',
@@ -210,8 +248,32 @@ export const updateTaskStatus = (id: string, status: string): Promise<Task> =>
     body: JSON.stringify({ status }),
   });
 
+export const updateTaskProgress = (id: string, progress: number): Promise<Task> =>
+  request<Task>(`/api/tasks/${id}/progress`, {
+    method: 'PATCH',
+    body: JSON.stringify({ progress }),
+  });
+
 export const deleteTask = (id: string): Promise<void> =>
   request<void>(`/api/tasks/${id}`, { method: 'DELETE' });
+
+export interface TaskRecommendation {
+  id: string;
+  name: string;
+  email: string;
+  completedTasks: number;
+  availabilityScore: number;
+}
+
+export interface TaskRecommendationsResponse {
+  task: { id: string; title: string; status?: string };
+  isOverdue: boolean;
+  daysOverdue?: number;
+  recommendations: TaskRecommendation[];
+}
+
+export const getTaskRecommendations = (taskId: string): Promise<TaskRecommendationsResponse> =>
+  request<TaskRecommendationsResponse>(`/api/tasks/${taskId}/recommendations`);
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
@@ -223,6 +285,11 @@ export const markNotificationRead = (id: string): Promise<Notification> =>
 
 export const markAllNotificationsRead = (): Promise<void> =>
   request<void>('/api/notifications/mark-all-read', { method: 'POST' });
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export const getMemberContributions = (): Promise<ProjectContribution[]> =>
+  request<ProjectContribution[]>('/api/dashboard/contributions');
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 

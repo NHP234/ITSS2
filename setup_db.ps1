@@ -1,8 +1,9 @@
+Write-Host "🚀 Đang khởi động Docker container cho Database..." -ForegroundColor Cyan
+docker-compose up -d db
+
 # Di chuyển vào thư mục backend
 Set-Location backend
 
-Write-Host "🚀 Đang khởi động Docker container cho Database..." -ForegroundColor Cyan
-docker-compose up -d
 
 Write-Host "⏳ Đang đợi Database sẵn sàng..." -ForegroundColor Yellow
 Start-Sleep -Seconds 5

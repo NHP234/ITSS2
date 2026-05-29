@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mockup
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgresql://user:password@db:5432/mockup?schema=public
+      - FRONTEND_URL=http://localhost:5174
+      - JWT_SECRET=itss2-super-secret-jwt-key-change-in-production
+    depends_on:
+      - db
+    # Required for Prisma if connecting on startup
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5174:5174"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    depends_on:
+      - backend
+    # Required for Vite HMR (Hot Module Replacement)
+    volumes:
+      - ./frontend/src:/app/src
+
+volumes:
+  postgres_data:

@@ -12,6 +12,17 @@ async function getAll(req, res) {
   }
 }
 
+// GET /api/tasks/overdue
+async function getOverdue(req, res) {
+  try {
+    const tasks = await taskService.getOverdueTasks(req.userId);
+    res.json(tasks);
+  } catch (err) {
+    console.error('[Task] getOverdue:', err.message);
+    res.status(500).json({ error: 'Không thể lấy danh sách công việc quá hạn' });
+  }
+}
+
 // GET /api/tasks/:id
 async function getOne(req, res) {
   try {
@@ -70,6 +81,21 @@ async function updateStatus(req, res) {
   }
 }
 
+// PATCH /api/tasks/:id/progress
+async function updateProgress(req, res) {
+  try {
+    const { progress } = req.body;
+    if (progress === undefined) return res.status(400).json({ error: 'Thiếu trường progress' });
+    const task = await taskService.updateTaskProgress(req.params.id, progress);
+    res.json(task);
+  } catch (err) {
+    console.error('[Task] updateProgress:', err.message);
+    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Không tìm thấy công việc' });
+    res.status(500).json({ error: 'Không thể cập nhật tiến độ' });
+  }
+}
+
 // DELETE /api/tasks/:id
 async function remove(req, res) {
   try {
@@ -82,4 +108,18 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { getAll, getOne, create, update, updateStatus, remove };
+// GET /api/tasks/:id/recommendations
+async function getRecommendations(req, res) {
+  try {
+    const recommendations = await taskService.getTaskRecommendations(req.params.id);
+    res.json(recommendations);
+  } catch (err) {
+    console.error('[Task] getRecommendations:', err.message);
+    if (err.message.includes('Không tìm thấy')) {
+      return res.status(404).json({ error: 'Không tìm thấy công việc' });
+    }
+    res.status(500).json({ error: 'Không thể lấy gợi ý' });
+  }
+}
+
+module.exports = { getAll, getOne, create, update, updateStatus, remove, getRecommendations };

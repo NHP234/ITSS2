@@ -31,6 +31,26 @@ async function getProjectById(id) {
   });
 }
 
+// Helper function to parse Vietnamese date range
+function parseDateRange(dateStr) {
+  if (!dateStr) return null;
+  const parts = dateStr.split(' → ');
+  
+  const parseSingle = (s) => {
+    const match = s.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/);
+    if (match) {
+      return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+    }
+    return null;
+  };
+
+  const start = parseSingle(parts[0]);
+  const end = parts[1] ? parseSingle(parts[1]) : start;
+  
+  if (!start) return null;
+  return { start, end: end || start };
+}
+
 // ─── Tạo project mới ──────────────────────────────────────────────────────────
 async function createProject(data, creatorId) {
   const memberIds = data.memberIds || [];
@@ -39,11 +59,20 @@ async function createProject(data, creatorId) {
     memberIds.push(creatorId);
   }
 
+  // Parse dates to determine initial status
+  let initialStatus = 'Planning';
+  if (data.dates) {
+    const dateInfo = parseDateRange(data.dates);
+    if (dateInfo && dateInfo.start <= new Date()) {
+      initialStatus = 'In Progress';
+    }
+  }
+
   return prisma.project.create({
     data: {
       name: data.name.trim(),
       description: data.description ?? '',
-      status: data.status ?? 'Planning',
+      status: initialStatus,
       owner: data.owner ?? '',
       dates: data.dates ?? '',
       priority: data.priority ?? '',
@@ -58,18 +87,28 @@ async function createProject(data, creatorId) {
   });
 }
 
-// ─── Cập nhật project ─────────────────────────────────────────────────────────
+// ─── Cập nhật project với auto-status based on dates ─────────────────────────
 async function updateProject(id, data) {
   const updateData = {};
   if (data.name !== undefined)        updateData.name = data.name.trim();
   if (data.description !== undefined) updateData.description = data.description;
-  if (data.status !== undefined)      updateData.status = data.status;
   if (data.owner !== undefined)       updateData.owner = data.owner;
   if (data.dates !== undefined)       updateData.dates = data.dates;
   if (data.priority !== undefined)    updateData.priority = data.priority;
   if (data.completion !== undefined)  updateData.completion = data.completion;
   if (data.blockedBy !== undefined)   updateData.blockedBy = data.blockedBy;
   if (data.icon !== undefined)        updateData.icon = data.icon;
+  
+  // Handle status updates - only allow manual status if explicitly provided
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+  } else if (data.dates !== undefined) {
+    // Auto-update status based on dates if no manual status provided
+    const dateInfo = parseDateRange(data.dates);
+    if (dateInfo && dateInfo.start <= new Date()) {
+      updateData.status = 'In Progress';
+    }
+  }
 
   return prisma.project.update({ 
     where: { id }, 
@@ -79,6 +118,26 @@ async function updateProject(id, data) {
       members: { select: { id: true, name: true, email: true } },
     }
   });
+}
+
+// Function to update project status based on current date (called periodically)
+async function updateProjectStatusByDate(projectId) {
+  const project = await prisma.project.findUnique({
+    where: { id },
+    select: { dates: true, status: true }
+  });
+  
+  if (!project || project.status === 'Finished') return;
+  
+  const dateInfo = parseDateRange(project.dates);
+  if (dateInfo && dateInfo.start <= new Date() && project.status === 'Planning') {
+    return prisma.project.update({
+      where: { id: projectId },
+      data: { status: 'In Progress' }
+    });
+  }
+  
+  return null;
 }
 
 // ─── Xoá project (và tất cả tasks) ───────────────────────────────────────────
@@ -184,4 +243,5 @@ module.exports = {
   removeMember,
   addLink,
   removeLink,
+  updateProjectStatusByDate, // Add this
 };
