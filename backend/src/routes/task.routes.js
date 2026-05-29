@@ -7,8 +7,8 @@ const router = Router();
 // GET    /api/tasks
 router.get('/', task.getAll);
 
-// GET    /api/tasks/overdue  — task quá hạn của user hiện tại
-router.get('/overdue', authMiddleware, task.getOverdue);
+// GET    /api/tasks/:id/recommendations (MUST be before /:id)
+router.get('/:id/recommendations', task.getRecommendations);
 
 // GET    /api/tasks/:id
 router.get('/:id', task.getOne);

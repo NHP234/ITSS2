@@ -1,5 +1,5 @@
 import { useState, useMemo, memo } from 'react';
-import { Plus, CircleDot, ChevronDown, Target, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, LayoutGrid, Calendar, Trash2, X, Check } from 'lucide-react';
+import { Plus, CircleDot, ChevronDown, Target, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, LayoutGrid, Calendar, Trash2, X, Check, Play, CheckCircle, Pause } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
@@ -34,6 +34,32 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
     completion: true,
     blockedBy: true,
   });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Planning':
+        return 'bg-blue-600';
+      case 'In Progress':
+        return 'bg-yellow-600';
+      case 'Finished':
+        return 'bg-green-600';
+      default:
+        return 'bg-gray-600';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'High':
+        return 'bg-red-600/80 text-red-100 hover:bg-red-600/80';
+      case 'Medium':
+        return 'bg-yellow-600/80 text-yellow-100 hover:bg-yellow-600/80';
+      case 'Low':
+        return 'bg-green-600/80 text-green-100 hover:bg-green-600/80';
+      default:
+        return 'bg-gray-600/80 text-gray-100 hover:bg-gray-600/80';
+    }
+  };
 
   const processedProjects = useMemo(() => {
     let result = [...projects];
@@ -86,34 +112,6 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
       return acc;
     }, {} as Record<string, typeof projects>);
   }, [processedProjects]);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Planning':
-        return 'bg-blue-600';
-      case 'In Progress':
-        return 'bg-yellow-600';
-      case 'Done':
-        return 'bg-green-600';
-      case 'Backlog':
-        return 'bg-gray-600';
-      default:
-        return 'bg-gray-600';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'High':
-        return 'bg-red-600/80 text-red-100 hover:bg-red-600/80';
-      case 'Medium':
-        return 'bg-yellow-600/80 text-yellow-100 hover:bg-yellow-600/80';
-      case 'Low':
-        return 'bg-green-600/80 text-green-100 hover:bg-green-600/80';
-      default:
-        return 'bg-gray-600/80 text-gray-100 hover:bg-gray-600/80';
-    }
-  };
 
   const renderActiveView = () => (
     <>
@@ -180,13 +178,22 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
                     </td>
                     <td className="px-4 py-3">
                       <Badge className={`${getStatusColor(project.status)} text-white px-2 py-0.5 text-xs`}>
+                        {project.status === 'In Progress' ? (
+                          <Play className="w-2.5 h-2.5 inline mr-1" />
+                        ) : project.status === 'Finished' ? (
+                          <CheckCircle className="w-2.5 h-2.5 inline mr-1" />
+                        ) : (
+                          <Pause className="w-2.5 h-2.5 inline mr-1" />
+                        )}
                         {project.status}
                       </Badge>
                     </td>
                     {showColumns.owner && (
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded bg-gray-700 flex items-center justify-center text-xs">B</div>
+                          <div className="w-5 h-5 rounded bg-gray-700 flex items-center justify-center text-xs">
+                            {project.owner?.charAt(0).toUpperCase() || '?'}
+                          </div>
                           <span className="text-sm text-gray-300">{project.owner}</span>
                         </div>
                       </td>
@@ -255,15 +262,13 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
   );
 
   const renderBoardView = () => {
-    // Ensure we show Planning, In Progress, Backlog even if empty for the board view
-    const boardStatuses = ['Planning', 'In Progress', 'Backlog'];
+    const boardStatuses = ['Planning', 'In Progress', 'Finished'];
     const allStatuses = Array.from(new Set([...boardStatuses, ...Object.keys(groupedProjects)]));
 
     return (
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
         {allStatuses.map(status => {
           const statusProjects = groupedProjects[status] || [];
-          // Skip empty statuses unless they are one of the main board columns
           if (statusProjects.length === 0 && !boardStatuses.includes(status)) return null;
 
           return (
@@ -342,12 +347,13 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
     );
   };
 
+  // ... (keep parseVNDate and renderTimelineView functions, but update status colors to use Finished)
+
   const parseVNDate = (dateStr: string) => {
     if (!dateStr) return null;
     const parts = dateStr.split(' → ');
     
     const parseSingle = (s: string) => {
-      // Format: "17 tháng 9, 2025"
       const match = s.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/);
       if (match) {
         return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
@@ -363,92 +369,89 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
   };
 
   const renderTimelineView = () => {
-    const timelineStart = new Date(2025, 7, 1); // 1/8/2025
-    const timelineEnd = new Date(2025, 11, 31); // 31/12/2025
+    const timelineStart = new Date(2025, 7, 1);
+    const timelineEnd = new Date(2025, 11, 31);
     const totalMs = timelineEnd.getTime() - timelineStart.getTime();
 
     return (
-    <div className="flex h-full border border-gray-800/60 rounded-xl overflow-hidden bg-[#1e1e1e]">
-      {/* Left Sidebar */}
-      <div className="w-[300px] border-r border-gray-800/60 flex flex-col bg-[#1a1a1a] z-10 shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
-        <div className="h-14 border-b border-gray-800/60 flex items-center px-5 shrink-0">
-          <span className="text-sm font-semibold text-gray-300">Quản lý trong Lịch</span>
-        </div>
-        <div className="flex-1 overflow-y-auto py-3">
-          {Object.entries(groupedProjects).map(([status, statusProjects]) => (
-            <div key={status} className="mb-4">
-              <div className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-gray-400 hover:text-gray-300 cursor-pointer group">
-                <ChevronDown className="w-4 h-4 text-gray-500 group-hover:text-gray-400" />
-                {status} <span className="text-xs text-gray-600">{statusProjects.length}</span>
-              </div>
-              {statusProjects.map(project => (
-                <div key={project.id} className="flex items-center gap-3 px-8 py-2.5 text-sm hover:bg-[#2a2a2a] cursor-pointer transition-colors group">
-                  <span className="text-base">{project.icon}</span>
-                  <span className="truncate font-medium text-gray-300 group-hover:text-white">{project.name}</span>
+      <div className="flex h-full border border-gray-800/60 rounded-xl overflow-hidden bg-[#1e1e1e]">
+        {/* Left Sidebar */}
+        <div className="w-[300px] border-r border-gray-800/60 flex flex-col bg-[#1a1a1a] z-10 shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
+          <div className="h-14 border-b border-gray-800/60 flex items-center px-5 shrink-0">
+            <span className="text-sm font-semibold text-gray-300">Quản lý trong Lịch</span>
+          </div>
+          <div className="flex-1 overflow-y-auto py-3">
+            {Object.entries(groupedProjects).map(([status, statusProjects]) => (
+              <div key={status} className="mb-4">
+                <div className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-gray-400 hover:text-gray-300 cursor-pointer group">
+                  <ChevronDown className="w-4 h-4 text-gray-500 group-hover:text-gray-400" />
+                  {status} <span className="text-xs text-gray-600">{statusProjects.length}</span>
                 </div>
-              ))}
-            </div>
-          ))}
-          <Button 
-            variant="ghost" 
-            className="ml-8 text-gray-500 hover:text-gray-300 hover:bg-[#2a2a2a] justify-start text-sm py-1 h-8"
-            onClick={onCreateProject}
-          >
-            <Plus className="w-3.5 h-3.5 mr-2" />
-            Mới
-          </Button>
-        </div>
-      </div>
-      
-      {/* Timeline Grid */}
-      <div className="flex-1 flex flex-col overflow-x-auto bg-[#141414]">
-        <div className="h-14 border-b border-gray-800/60 flex min-w-max shrink-0 bg-[#1a1a1a]">
-          {['Tháng 8 2025', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'].map((month, i) => (
-            <div key={i} className="w-[200px] border-r border-gray-800/60 flex flex-col">
-              <div className="text-[13px] font-medium text-center text-gray-300 py-1.5">{month}</div>
-              <div className="flex border-t border-gray-800/60 flex-1">
-                {[1, 8, 15, 22].map((day, j) => (
-                  <div key={j} className="flex-1 text-[11px] font-medium flex items-center justify-center text-gray-500 border-r border-gray-800/40 last:border-0">
-                    {day}
+                {statusProjects.map(project => (
+                  <div key={project.id} className="flex items-center gap-3 px-8 py-2.5 text-sm hover:bg-[#2a2a2a] cursor-pointer transition-colors group">
+                    <span className="text-base">{project.icon}</span>
+                    <span className="truncate font-medium text-gray-300 group-hover:text-white">{project.name}</span>
                   </div>
                 ))}
               </div>
-            </div>
-          ))}
+            ))}
+            <Button 
+              variant="ghost" 
+              className="ml-8 text-gray-500 hover:text-gray-300 hover:bg-[#2a2a2a] justify-start text-sm py-1 h-8"
+              onClick={onCreateProject}
+            >
+              <Plus className="w-3.5 h-3.5 mr-2" />
+              Mới
+            </Button>
+          </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto relative min-w-max py-3">
-          {/* Grid lines */}
-          <div className="absolute inset-0 flex pointer-events-none">
-            {[...Array(20)].map((_, i) => (
-              <div key={i} className="w-[50px] border-r border-gray-800/20" />
+        {/* Timeline Grid */}
+        <div className="flex-1 flex flex-col overflow-x-auto bg-[#141414]">
+          <div className="h-14 border-b border-gray-800/60 flex min-w-max shrink-0 bg-[#1a1a1a]">
+            {['Tháng 8 2025', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'].map((month, i) => (
+              <div key={i} className="w-[200px] border-r border-gray-800/60 flex flex-col">
+                <div className="text-[13px] font-medium text-center text-gray-300 py-1.5">{month}</div>
+                <div className="flex border-t border-gray-800/60 flex-1">
+                  {[1, 8, 15, 22].map((day, j) => (
+                    <div key={j} className="flex-1 text-[11px] font-medium flex items-center justify-center text-gray-500 border-r border-gray-800/40 last:border-0">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
           
-          {/* Project bars */}
-          <div className="relative z-10">
-            {Object.entries(groupedProjects).map(([status, statusProjects]) => (
-              <div key={status} className="mb-4">
-                <div className="h-[34px]" /> {/* Status header space */}
-                {statusProjects.map((project) => {
-                  const dateInfo = parseVNDate(project.dates);
-                  let left = '0%';
-                  let width = '0%';
+          <div className="flex-1 overflow-y-auto relative min-w-max py-3">
+            <div className="absolute inset-0 flex pointer-events-none">
+              {[...Array(20)].map((_, i) => (
+                <div key={i} className="w-[50px] border-r border-gray-800/20" />
+              ))}
+            </div>
+            
+            <div className="relative z-10">
+              {Object.entries(groupedProjects).map(([status, statusProjects]) => (
+                <div key={status} className="mb-4">
+                  <div className="h-[34px]" />
+                  {statusProjects.map((project) => {
+                    const dateInfo = parseVNDate(project.dates);
+                    let left = '0%';
+                    let width = '0%';
 
-                  if (dateInfo) {
-                    const startOffset = dateInfo.start.getTime() - timelineStart.getTime();
-                    const endOffset = dateInfo.end.getTime() - timelineStart.getTime();
+                    if (dateInfo) {
+                      const startOffset = dateInfo.start.getTime() - timelineStart.getTime();
+                      const endOffset = dateInfo.end.getTime() - timelineStart.getTime();
+                      
+                      const leftPercent = Math.max(0, Math.min(100, (startOffset / totalMs) * 100));
+                      const rightPercent = Math.max(0, Math.min(100, (endOffset / totalMs) * 100));
+                      
+                      left = `${leftPercent}%`;
+                      width = `${Math.max(2, rightPercent - leftPercent)}%`;
+                    }
                     
-                    const leftPercent = Math.max(0, Math.min(100, (startOffset / totalMs) * 100));
-                    const rightPercent = Math.max(0, Math.min(100, (endOffset / totalMs) * 100));
-                    
-                    left = `${leftPercent}%`;
-                    width = `${Math.max(2, rightPercent - leftPercent)}%`;
-                  }
-                  
-                  return (
-                    <div key={project.id} className="h-[44px] relative group flex items-center">
-                      {project.status && (
+                    return (
+                      <div key={project.id} className="h-[44px] relative group flex items-center">
                         <div 
                           className={`absolute h-[28px] rounded-full flex items-center px-3 shadow-sm hover:shadow-md hover:brightness-110 transition-all cursor-pointer whitespace-nowrap bg-[#2a2a2a] border border-gray-700/50`}
                           style={{ left, width, minWidth: '220px' }}
@@ -469,19 +472,18 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-            <div className="h-[32px]" /> {/* Add space for 'Mới' button in sidebar */}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              <div className="h-[32px]" />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   return (
     <div className="min-h-full bg-[#121212] text-white">
@@ -552,7 +554,7 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
                 <div>
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Trạng thái</h4>
                   <div className="space-y-1">
-                    {['Planning', 'In Progress', 'Done', 'Backlog'].map(status => (
+                    {['Planning', 'In Progress', 'Finished'].map(status => (
                       <label key={status} className="flex items-center gap-2 text-sm text-gray-300 hover:text-white cursor-pointer group py-1 rounded px-2 hover:bg-gray-800">
                         <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors ${filterStatuses.includes(status) ? 'bg-blue-600 border-blue-600' : 'border-gray-600 group-hover:border-gray-400'}`}>
                           {filterStatuses.includes(status) && <Check className="w-2.5 h-2.5 text-white" />}

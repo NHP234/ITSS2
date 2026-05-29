@@ -47,12 +47,10 @@ export interface Task {
   projectId: string;
   assignee?: string;
   due?: string;
-  dueDate?: string;
-  priority?: TaskPriority | string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Very High';
   summary?: string;
   icon?: string;
-  weight?: number;
-  progress?: number;
+  weight?: number; // Combined complexity score (2-10)
   createdAt?: string;
   updatedAt?: string;
   assignees?: User[];
@@ -70,20 +68,30 @@ export interface Notification {
   createdAt: string;
 }
 
-export interface MemberStat {
-  member: User;
-  totalAssigned: number;
-  done: number;
-  overdue: number;
-  inProgress: number;
-  completionRate: number;
+export interface TaskRecommendationsResponse {
+  task: { 
+    id: string; 
+    title: string; 
+    status?: string;
+    priority?: string;
+    weight?: number;
+    complexityLevel?: string;
+  };
+  isOverdue: boolean;
+  daysOverdue?: number;
+  currentTaskWeight?: number;
+  recommendations: TaskRecommendation[];
 }
 
-export interface ProjectContribution {
-  projectId: string;
-  projectName: string;
-  projectIcon: string;
-  members: MemberStat[];
+export interface TaskRecommendation {
+  id: string;
+  name: string;
+  email: string;
+  completedTasks: number;
+  avgWeight: string;
+  experienceBonus: number;
+  availabilityScore: number;
+  canHandleCurrentTask: boolean;
 }
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
@@ -94,10 +102,15 @@ function getAuthHeaders() {
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const authHeaders = getAuthHeaders();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
+
+  // Only add Authorization header if it exists
+  if (authHeaders['Authorization']) {
+    headers['Authorization'] = authHeaders['Authorization'];
+  }
 
   if (init?.headers) {
     const initHeaders = init.headers as Record<string, string>;
@@ -243,6 +256,24 @@ export const updateTaskProgress = (id: string, progress: number): Promise<Task> 
 
 export const deleteTask = (id: string): Promise<void> =>
   request<void>(`/api/tasks/${id}`, { method: 'DELETE' });
+
+export interface TaskRecommendation {
+  id: string;
+  name: string;
+  email: string;
+  completedTasks: number;
+  availabilityScore: number;
+}
+
+export interface TaskRecommendationsResponse {
+  task: { id: string; title: string; status?: string };
+  isOverdue: boolean;
+  daysOverdue?: number;
+  recommendations: TaskRecommendation[];
+}
+
+export const getTaskRecommendations = (taskId: string): Promise<TaskRecommendationsResponse> =>
+  request<TaskRecommendationsResponse>(`/api/tasks/${taskId}/recommendations`);
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 

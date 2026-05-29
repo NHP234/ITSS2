@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '../ui/sheet';
 import { Button } from '../ui/button';
-import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Image as ImageIcon, LayoutTemplate } from 'lucide-react';
+import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Palette } from 'lucide-react';
 import { CustomDatePicker } from '../common/CustomDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { searchUsers } from '../../api';
@@ -13,6 +13,13 @@ interface CreateProjectDialogProps {
   onCreate: (data: any) => void;
   currentUser?: { name: string };
 }
+
+// Predefined project icons
+const PROJECT_ICONS = [
+  '🎯', '🚀', '💼', '🎨', '📊', '💡', '🔧', '📱', '💻', '🌐',
+  '🤖', '🎮', '📈', '🏗️', '⚡', '🌟', '🔒', '☁️', '📚', '🎓',
+  '🏆', '💎', '🔬', '🧪', '🏥', '💊', '🌿', '♻️', '🎭', '📰'
+];
 
 export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: CreateProjectDialogProps) {
   const [name, setName] = useState('New Project');
@@ -27,6 +34,8 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
   const [taskSearch, setTaskSearch] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
   const [showDoneTasks, setShowDoneTasks] = useState(true);
+  const [selectedIcon, setSelectedIcon] = useState('🎯');
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,12 +45,14 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
         description,
         dates,
         memberIds: members.map(m => m.id),
-        tasks: projectTasks // Giả sử backend hỗ trợ tạo kèm tasks
+        tasks: projectTasks,
+        icon: selectedIcon
       });
       setName('New Project');
       setDescription('');
       setDates('');
       setMembers([]);
+      setSelectedIcon('🎯');
       onClose();
     }
   };
@@ -123,26 +134,50 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
           <div className="flex-1 overflow-auto">
             <div className="px-8 py-8 space-y-6">
               
-              <div className="flex items-center gap-4 mb-2">
-                <Button variant="ghost" size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-gray-400">
-                  <ImageIcon className="w-4 h-4 mr-2" />
-                  Thêm ảnh bìa
-                </Button>
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:bg-[#2a2a2a]">
-                  <LayoutTemplate className="w-4 h-4 mr-2" />
-                  Tùy chỉnh bố cục
-                </Button>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Target className="w-8 h-8 text-gray-400 mb-2" />
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="text-4xl font-bold font-sans tracking-tight border-b-2 border-dashed border-gray-600 pb-1 w-full bg-transparent outline-none focus:border-gray-400 transition-colors"
-                  placeholder="Untitled"
-                  autoFocus
-                />
+              {/* Icon Selector */}
+              <div className="flex items-start gap-4 mb-2">
+                <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-16 h-16 bg-[#2a2a2a] hover:bg-[#333] rounded-xl flex items-center justify-center text-4xl transition-all hover:scale-105"
+                    >
+                      {selectedIcon}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 bg-[#1e1e1e] border-[#333] p-3 shadow-2xl rounded-xl">
+                    <div className="mb-2 pb-2 border-b border-gray-800">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Chọn biểu tượng</h4>
+                    </div>
+                    <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto">
+                      {PROJECT_ICONS.map((icon, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => {
+                            setSelectedIcon(icon);
+                            setIconPickerOpen(false);
+                          }}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center text-xl transition-all hover:bg-blue-600/20 ${
+                            selectedIcon === icon ? 'bg-blue-600/30 ring-2 ring-blue-500' : 'hover:bg-gray-800'
+                          }`}
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <div className="flex-1">
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="text-4xl font-bold font-sans tracking-tight border-b-2 border-dashed border-gray-600 pb-1 w-full bg-transparent outline-none focus:border-gray-400 transition-colors"
+                    placeholder="Untitled"
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-500 mt-2">Nhấp vào biểu tượng để thay đổi</p>
+                </div>
               </div>
 
               <div className="space-y-3 mt-8">
@@ -192,7 +227,7 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                           <div className="relative">
                             <Search className="absolute left-2 top-2 w-3 h-3 text-gray-500" />
                             <input 
-                              className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md py-1.5 pl-7 pr-2 text-xs outline-none focus:border-blue-500"
+                              className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md py-1.5 pl-7 pr-2 text-xs text-white outline-none focus:border-blue-500 placeholder:text-gray-500"
                               placeholder="Tìm theo email hoặc tên..."
                               value={userSearch}
                               onChange={(e) => handleSearchUsers(e.target.value)}
@@ -206,10 +241,10 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                                 onClick={() => addMember(u)}
                                 className="w-full flex items-center gap-2 p-1.5 hover:bg-blue-600 rounded text-left transition-colors"
                               >
-                                <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center text-[9px]">{u.name.charAt(0).toUpperCase()}</div>
+                                <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center text-[9px] text-white">{u.name.charAt(0).toUpperCase()}</div>
                                 <div className="flex flex-col">
-                                  <span className="text-xs">{u.name}</span>
-                                  <span className="text-[10px] opacity-70">{u.email}</span>
+                                  <span className="text-xs text-white">{u.name}</span>
+                                  <span className="text-[10px] text-gray-400">{u.email}</span>
                                 </div>
                               </button>
                             ))}
@@ -219,8 +254,8 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                           <div className="p-2 border-t border-gray-800 max-h-32 overflow-y-auto">
                             {members.map(m => (
                               <div key={m.id} className="flex items-center justify-between p-1">
-                                <span className="text-[10px] text-gray-400">{m.email}</span>
-                                <button type="button" onClick={() => removeMember(m.id)}><X className="w-3 h-3 text-gray-500 hover:text-red-400" /></button>
+                                <span className="text-[10px] text-gray-300">{m.email}</span>
+                                <button type="button" onClick={() => removeMember(m.id)}><X className="w-3 h-3 text-gray-400 hover:text-red-400" /></button>
                               </div>
                             ))}
                           </div>
@@ -253,24 +288,9 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                     />
                   </div>
                 </div>
-
-                <button type="button" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-400 pt-2">
-                  <ChevronDown className="w-4 h-4" />
-                  Thêm 5 thuộc tính
-                </button>
               </div>
 
               <div className="space-y-6 pt-6 border-t border-gray-800">
-                <div>
-                  <p className="text-sm font-semibold text-gray-300 mb-2">Quan hệ</p>
-                  <button type="button" className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-300">
-                    <div className="w-4 h-4 rounded-full border border-gray-500 flex items-center justify-center">
-                      <Check className="w-3 h-3" />
-                    </div>
-                    Thêm Tasks
-                  </button>
-                </div>
-
                 <div>
                   <p className="text-sm font-semibold text-gray-300 mb-2">Bình luận</p>
                   <div className="flex items-center gap-2">
@@ -278,7 +298,7 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                       {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
                     </div>
                     <input 
-                      className="flex-1 bg-[#222] border border-gray-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-blue-500 transition-colors"
+                      className="flex-1 bg-[#222] border border-gray-800 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500 transition-colors placeholder:text-gray-500"
                       placeholder="Thêm bình luận..."
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
@@ -290,7 +310,7 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
               <div className="space-y-4 pt-6 border-t border-gray-800">
                 <h3 className="text-xl font-bold">About this project</h3>
                 <textarea 
-                  className="w-full bg-transparent border-none outline-none text-gray-400 text-sm leading-relaxed min-h-[100px] resize-none focus:text-gray-300"
+                  className="w-full bg-transparent border-none outline-none text-gray-300 text-sm leading-relaxed min-h-[100px] resize-none focus:text-white"
                   placeholder="Nhập mô tả dự án tại đây..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -345,7 +365,7 @@ export function CreateProjectDialog({ open, onClose, onCreate, currentUser }: Cr
                     <div className="relative flex items-center bg-[#222] rounded-lg border border-gray-800 px-2">
                       <Search className="w-3.5 h-3.5 text-gray-500 mr-2" />
                       <input 
-                        className="bg-transparent text-xs py-1.5 outline-none w-32 focus:w-48 transition-all"
+                        className="bg-transparent text-xs text-white py-1.5 outline-none w-32 focus:w-48 transition-all placeholder:text-gray-500"
                         placeholder="Tìm công việc..."
                         value={taskSearch}
                         onChange={(e) => setTaskSearch(e.target.value)}

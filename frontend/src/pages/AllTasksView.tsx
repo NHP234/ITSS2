@@ -1,11 +1,16 @@
 import { useState, memo, useMemo } from 'react';
 import { 
   CheckSquare, Target, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, 
+<<<<<<< HEAD
   ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, TrendingUp
+=======
+  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, Activity
+>>>>>>> feature/recommendation
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { CustomDatePicker } from '../components/common/CustomDatePicker';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 
 import { type Project, type Task } from '../api';
 
@@ -16,13 +21,58 @@ interface AllTasksViewProps {
   onCreateTask: (projectId: string, status: string) => void;
   onDeleteTask?: (taskId: string) => void;
   onSelectProject?: (projectId: string) => void;
+  onUpdateTaskStatus?: (taskId: string, status: "Not Started" | "In Progress" | "Done") => void;
 }
 
-export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpdateTask, onCreateTask, onDeleteTask, onSelectProject }: AllTasksViewProps) {
+// Helper to get status label in Vietnamese
+const getStatusLabel = (status: string): string => {
+  switch (status) {
+    case 'Not Started': return 'Chưa bắt đầu';
+    case 'In Progress': return 'Đang thực hiện';
+    case 'Done': return 'Hoàn thành';
+    default: return status;
+  }
+};
+
+// Priority labels stay in English to sync with backend
+const getPriorityBadge = (priority?: string) => {
+  if (!priority) return null;
+  if (priority === 'High') {
+    return <Badge className="bg-red-900/80 text-red-100 hover:bg-red-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">High</Badge>;
+  }
+  if (priority === 'Medium') {
+    return <Badge className="bg-orange-900/80 text-orange-100 hover:bg-orange-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Medium</Badge>;
+  }
+  if (priority === 'Low') {
+    return <Badge className="bg-green-900/80 text-green-100 hover:bg-green-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Low</Badge>;
+  }
+  if (priority === 'Very High') {
+    return <Badge className="bg-purple-900/80 text-purple-100 hover:bg-purple-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Very High</Badge>;
+  }
+  return <Badge className="bg-gray-800 text-gray-300 rounded uppercase text-[10px] px-1.5 py-0 border-none">{priority}</Badge>;
+};
+
+const getTaskIcon = (iconName?: string) => {
+  if (iconName === 'calendar') return <Calendar className="w-4 h-4 text-blue-400" />;
+  if (iconName === 'cloud') return <Cloud className="w-4 h-4 text-blue-400" />;
+  if (iconName === 'activity') return <Activity className="w-4 h-4 text-green-400" />;
+  return <FileText className="w-4 h-4 text-gray-400" />;
+};
+
+export const AllTasksView = memo(function AllTasksView({ 
+  projects, 
+  tasks, 
+  onUpdateTask, 
+  onCreateTask, 
+  onDeleteTask, 
+  onSelectProject,
+  onUpdateTaskStatus
+}: AllTasksViewProps) {
   const [activeTab, setActiveTab] = useState<'By project' | 'Board' | 'All tasks'>('Board');
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
     projects.reduce((acc, p) => ({ ...acc, [p.id]: true }), {})
   );
+  const [taskSearch, setTaskSearch] = useState('');
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects(prev => ({ ...prev, [projectId]: !prev[projectId] }));
@@ -47,14 +97,14 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
         return (
           <div className="inline-flex items-center gap-1.5 bg-green-900/40 border border-green-800 px-2 py-0.5 rounded-full">
             <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-xs text-green-100 font-medium">Done</span>
+            <span className="text-xs text-green-100 font-medium">Hoàn thành</span>
           </div>
         );
       case 'In Progress':
         return (
           <div className="inline-flex items-center gap-1.5 bg-blue-900/40 border border-blue-800 px-2 py-0.5 rounded-full">
             <div className="w-2 h-2 rounded-full bg-blue-500" />
-            <span className="text-xs text-blue-100 font-medium">In Progress</span>
+            <span className="text-xs text-blue-100 font-medium">Đang thực hiện</span>
           </div>
         );
       case 'Reviewing':
@@ -68,12 +118,13 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
         return (
           <div className="inline-flex items-center gap-1.5 bg-[#444] border border-[#555] px-2 py-0.5 rounded-full">
             <div className="w-2 h-2 rounded-full bg-gray-400" />
-            <span className="text-xs text-white font-medium">Not Started</span>
+            <span className="text-xs text-white font-medium">Chưa bắt đầu</span>
           </div>
         );
     }
   };
 
+<<<<<<< HEAD
   const getPriorityBadge = (priority?: string) => {
     if (!priority) return null;
     if (priority === 'Very High') {
@@ -81,20 +132,29 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
     }
     if (priority === 'High') {
       return <Badge className="bg-red-900/80 text-red-100 hover:bg-red-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">High</Badge>;
+=======
+  // Handle moving task between statuses
+  const handleMoveTask = (taskId: string, newStatus: "Not Started" | "In Progress" | "Done") => {
+    if (onUpdateTaskStatus) {
+      onUpdateTaskStatus(taskId, newStatus);
+    } else {
+      onUpdateTask(taskId, { status: newStatus });
+>>>>>>> feature/recommendation
     }
-    if (priority === 'Medium') {
-      return <Badge className="bg-orange-900/80 text-orange-100 hover:bg-orange-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Medium</Badge>;
-    }
-    if (priority === 'Low') {
-      return <Badge className="bg-green-900/80 text-green-100 hover:bg-green-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Low</Badge>;
-    }
-    return <Badge className="bg-gray-800 text-gray-300 rounded uppercase text-[10px] px-1.5 py-0 border-none">{priority}</Badge>;
   };
 
-  const getTaskIcon = (iconName?: string) => {
-    if (iconName === 'calendar') return <Calendar className="w-4 h-4 text-blue-400" />;
-    if (iconName === 'cloud') return <Cloud className="w-4 h-4 text-blue-400" />;
-    return <FileText className="w-4 h-4 text-gray-400" />;
+  // Filter tasks based on search
+  const filteredTasks = useMemo(() => {
+    if (!taskSearch) return tasks;
+    return tasks.filter(t => 
+      t.title.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      (t.summary && t.summary.toLowerCase().includes(taskSearch.toLowerCase()))
+    );
+  }, [tasks, taskSearch]);
+
+  // Filter tasks by project for By project view
+  const getFilteredProjectTasks = (projectId: string) => {
+    return filteredTasks.filter(t => t.projectId === projectId);
   };
 
   const renderTable = (projectId: string, projectTasks: Task[]) => {
@@ -110,27 +170,27 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
               <tr className="border-b border-gray-800 text-gray-400">
                 <th className="font-medium py-2 pl-8 pr-4 w-1/4">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-bold">Aa</span> Task name
+                    <span className="text-[10px] uppercase font-bold">Aa</span> Tên nhiệm vụ
                   </div>
                 </th>
                 <th className="font-medium py-2 px-4 w-32">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5" /> Status
+                    <Sparkles className="w-3.5 h-3.5" /> Trạng thái
                   </div>
                 </th>
                 <th className="font-medium py-2 px-4 w-32">
                   <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5" /> Assignee
+                    <Users className="w-3.5 h-3.5" /> Người được gán
                   </div>
                 </th>
                 <th className="font-medium py-2 px-4 w-40">
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5" /> Due
+                    <Calendar className="w-3.5 h-3.5" /> Hạn chót
                   </div>
                 </th>
                 <th className="font-medium py-2 px-4 w-28">
                   <div className="flex items-center gap-2">
-                    <Target className="w-3.5 h-3.5" /> Priority
+                    <Target className="w-3.5 h-3.5" /> Ưu tiên
                   </div>
                 </th>
                 <th className="font-medium py-2 px-4 w-24">
@@ -140,13 +200,14 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
                 </th>
                 <th className="font-medium py-2 px-4">
                   <div className="flex items-center gap-2">
-                    <AlignLeft className="w-3.5 h-3.5" /> Summary <Sparkles className="w-3 h-3 opacity-50" />
+                    <AlignLeft className="w-3.5 h-3.5" /> Tóm tắt
                   </div>
                 </th>
-                <th className="font-medium py-2 px-4 w-12 text-center text-gray-500">+ ...</th>
+                <th className="font-medium py-2 px-4 w-12 text-center text-gray-500">Hành động</th>
               </tr>
             </thead>
             <tbody>
+<<<<<<< HEAD
               {projectTasks.map((task) => {
                 const overdue = isOverdue(task);
                 return (
@@ -161,6 +222,66 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
                             onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
                             className="bg-transparent border-none outline-none text-white w-full font-medium"
                           />
+=======
+              {projectTasks.map((task) => (
+                <tr key={task.id} className="border-b border-gray-800/50 hover:bg-[#222] group">
+                  <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        {getTaskIcon(task.icon)}
+                        <input
+                          value={task.title}
+                          onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
+                          className="bg-transparent border-none outline-none text-white w-full font-medium"
+                        />
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-500 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteTask?.(task.id);
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          task.status === 'Not Started' ? 'bg-gray-700 text-gray-300' :
+                          task.status === 'In Progress' ? 'bg-blue-900/50 text-blue-200' :
+                          'bg-green-900/50 text-green-200'
+                        }`}>
+                          {getStatusLabel(task.status)}
+                          <ChevronDown className="w-3 h-3 inline ml-1" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-36 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-lg z-50">
+                        {['Not Started', 'In Progress', 'Done'].map(status => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => handleMoveTask(task.id, status as "Not Started" | "In Progress" | "Done")}
+                            className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                              status === task.status ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-800'
+                            }`}
+                          >
+                            {getStatusLabel(status)}
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                    {task.assignee ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
+                          {task.assignee.charAt(0)}
+>>>>>>> feature/recommendation
                         </div>
                         <Button
                           variant="ghost" size="sm"
@@ -170,6 +291,7 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
+<<<<<<< HEAD
                     </td>
                     <td className="py-2 px-4 border-r border-gray-800/50">
                       {getStatusBadge(task.status)}
@@ -233,6 +355,48 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
                   </tr>
                 );
               })}
+=======
+                    ) : null}
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                    <CustomDatePicker 
+                      trigger={
+                        <button type="button" className="text-gray-300 hover:text-white hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors w-full text-left">
+                          {task.due || 'Thêm ngày'}
+                        </button>
+                      }
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+                          onUpdateTask(task.id, { due: formattedDate });
+                        } else {
+                          onUpdateTask(task.id, { due: '' });
+                        }
+                      }}
+                    />
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50">
+                    {getPriorityBadge(task.priority)}
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                    <input
+                      value={task.summary || ''}
+                      onChange={(e) => onUpdateTask(task.id, { summary: e.target.value })}
+                      className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600"
+                      placeholder="Thêm tóm tắt..."
+                    />
+                  </td>
+                  <td className="py-2 px-4">
+                    <button 
+                      onClick={() => onDeleteTask?.(task.id)}
+                      className="text-gray-500 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+>>>>>>> feature/recommendation
               <tr>
                 <td colSpan={7} className="py-2 pl-8 text-gray-500 hover:bg-[#222] cursor-pointer" onClick={() => onCreateTask(projectId, 'Not Started')}>
                   <div className="flex items-center gap-2 text-sm">
@@ -253,7 +417,7 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
   const renderByProjectView = () => (
     <div className="space-y-6">
       {projects.map(project => {
-        const projectTasks = tasks.filter(t => t.projectId === project.id);
+        const projectTasks = getFilteredProjectTasks(project.id);
         if (projectTasks.length === 0) return null;
 
         return (
@@ -279,23 +443,210 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
     </div>
   );
 
+  // Render all tasks in a single table (no grouping by project)
+  const renderAllTasksView = () => {
+    const allTasks = filteredTasks;
+    const completedCount = allTasks.filter(t => t.status === 'Done').length;
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead>
+            <tr className="border-b border-gray-800 text-gray-400">
+              <th className="font-medium py-2 pl-8 pr-4 w-1/4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold">Aa</span> Tên nhiệm vụ
+                </div>
+              </th>
+              <th className="font-medium py-2 px-4 w-32">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5" /> Trạng thái
+                </div>
+              </th>
+              <th className="font-medium py-2 px-4 w-32">
+                <div className="flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5" /> Người được gán
+                </div>
+              </th>
+              <th className="font-medium py-2 px-4 w-40">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5" /> Hạn chót
+                </div>
+              </th>
+              <th className="font-medium py-2 px-4 w-28">
+                <div className="flex items-center gap-2">
+                  <Target className="w-3.5 h-3.5" /> Ưu tiên
+                </div>
+              </th>
+              <th className="font-medium py-2 px-4">
+                <div className="flex items-center gap-2">
+                  <AlignLeft className="w-3.5 h-3.5" /> Tóm tắt
+                </div>
+              </th>
+              <th className="font-medium py-2 px-4 w-12 text-center text-gray-500">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allTasks.map((task) => {
+              const project = projects.find(p => p.id === task.projectId);
+              return (
+                <tr key={task.id} className="border-b border-gray-800/50 hover:bg-[#222] group">
+                  <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        {getTaskIcon(task.icon)}
+                        <div className="flex flex-col flex-1">
+                          <input
+                            value={task.title}
+                            onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
+                            className="bg-transparent border-none outline-none text-white w-full font-medium"
+                          />
+                          {project && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="text-xs">{project.icon}</span>
+                              <span className="text-[10px] text-gray-500">{project.name}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-500 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteTask?.(task.id);
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          task.status === 'Not Started' ? 'bg-gray-700 text-gray-300' :
+                          task.status === 'In Progress' ? 'bg-blue-900/50 text-blue-200' :
+                          'bg-green-900/50 text-green-200'
+                        }`}>
+                          {getStatusLabel(task.status)}
+                          <ChevronDown className="w-3 h-3 inline ml-1" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-36 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-lg z-50">
+                        {['Not Started', 'In Progress', 'Done'].map(status => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => handleMoveTask(task.id, status as "Not Started" | "In Progress" | "Done")}
+                            className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                              status === task.status ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-800'
+                            }`}
+                          >
+                            {getStatusLabel(status)}
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                    {task.assignee ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
+                          {task.assignee.charAt(0)}
+                        </div>
+                        {task.assignee}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                    <CustomDatePicker 
+                      trigger={
+                        <button type="button" className="text-gray-300 hover:text-white hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors w-full text-left">
+                          {task.due || 'Thêm ngày'}
+                        </button>
+                      }
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+                          onUpdateTask(task.id, { due: formattedDate });
+                        } else {
+                          onUpdateTask(task.id, { due: '' });
+                        }
+                      }}
+                    />
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50">
+                    {getPriorityBadge(task.priority)}
+                  </td>
+                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                    <input
+                      value={task.summary || ''}
+                      onChange={(e) => onUpdateTask(task.id, { summary: e.target.value })}
+                      className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600"
+                      placeholder="Thêm tóm tắt..."
+                    />
+                  </td>
+                  <td className="py-2 px-4">
+                    <button 
+                      onClick={() => onDeleteTask?.(task.id)}
+                      className="text-gray-500 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {allTasks.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-gray-500">
+                  Không tìm thấy nhiệm vụ nào
+                </td>
+              </tr>
+            )}
+            <tr>
+              <td colSpan={7} className="py-2 pl-8 text-gray-500 hover:bg-[#222] cursor-pointer" onClick={() => onCreateTask(projects[0]?.id || '', 'Not Started')}>
+                <div className="flex items-center gap-2 text-sm">
+                  <Plus className="w-4 h-4" /> Nhiệm vụ mới
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        {allTasks.length > 0 && (
+          <div className="text-[10px] text-gray-500 uppercase tracking-widest pl-8 mt-2 font-medium">
+            HOÀN TẤT {completedCount}/{allTasks.length}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const groupedTasks = useMemo(() => {
-    return tasks.reduce((acc, task) => {
+    return filteredTasks.reduce((acc, task) => {
       if (!acc[task.status]) {
         acc[task.status] = [];
       }
       acc[task.status].push(task);
       return acc;
-    }, {} as Record<string, typeof tasks>);
-  }, [tasks]);
+    }, {} as Record<string, typeof filteredTasks>);
+  }, [filteredTasks]);
 
   const renderBoardView = () => {
+<<<<<<< HEAD
     const statuses = ['Not Started', 'In Progress', 'Reviewing', 'Done'];
+=======
+    const statuses = ['Not Started', 'In Progress', 'Done'];
+    const statusLabels = ['Chưa bắt đầu', 'Đang thực hiện', 'Hoàn thành'];
+>>>>>>> feature/recommendation
     
     return (
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
-        {statuses.map(status => {
+        {statuses.map((status, index) => {
           const statusTasks = groupedTasks[status] || [];
+          const statusLabel = statusLabels[index];
           
           let headerColor = 'bg-gray-800 text-gray-300';
           let bgColor = 'bg-[#1e1e1e] border-gray-800/60';
@@ -324,7 +675,7 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
               <div className="flex items-center justify-between mb-4">
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${headerColor} text-xs font-semibold`}>
                   <div className={`w-2 h-2 rounded-full ${dotColor}`} />
-                  {status}
+                  {statusLabel}
                 </div>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-300 h-6 w-8 p-0">
@@ -370,12 +721,18 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
                         <div className="flex items-center gap-2 mb-3 bg-[#1a1a1a] rounded p-1.5 px-2">
                           <span className="text-sm leading-none">{project.icon}</span>
                           <span className="text-[12px] text-gray-300 truncate font-medium">{project.name}</span>
-                          <span className="text-[10px] text-gray-500 ml-auto uppercase bg-gray-800 px-1 rounded">Project</span>
+                          <span className="text-[10px] text-gray-500 ml-auto uppercase bg-gray-800 px-1 rounded">Dự án</span>
                         </div>
                       )}
                       
                       <div className="flex items-center justify-between mt-auto pt-1">
                         {getPriorityBadge(task.priority)}
+                        {task.due && (
+                          <span className="text-[10px] text-gray-500">
+                            <Calendar className="w-3 h-3 inline mr-1" />
+                            {task.due}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -400,7 +757,7 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
     <div className="min-h-full bg-[#121212] text-white p-8">
       <div className="flex items-center gap-3 mb-6 shrink-0">
         <CheckSquare className="w-8 h-8" />
-        <h1 className="text-3xl font-bold">Tasks</h1>
+        <h1 className="text-3xl font-bold">Nhiệm vụ</h1>
       </div>
 
       <div className="flex items-center justify-between mb-8 border-b border-gray-800 pb-3 shrink-0">
@@ -409,49 +766,48 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'By project' ? 'bg-[#2a2a2a] text-white' : 'text-gray-400 hover:text-white hover:bg-[#2a2a2a]'}`}
             onClick={() => setActiveTab('By project')}
           >
-            <Target className="w-4 h-4" /> By project
+            <Target className="w-4 h-4" /> Theo dự án
           </button>
           <button 
             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'Board' ? 'bg-[#2a2a2a] text-white' : 'text-gray-400 hover:text-white hover:bg-[#2a2a2a]'}`}
             onClick={() => setActiveTab('Board')}
           >
-            <LayoutGrid className="w-4 h-4" /> Board
+            <LayoutGrid className="w-4 h-4" /> Bảng
           </button>
           <button 
             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'All tasks' ? 'bg-[#2a2a2a] text-white' : 'text-gray-400 hover:text-white hover:bg-[#2a2a2a]'}`}
             onClick={() => setActiveTab('All tasks')}
           >
-            <List className="w-4 h-4" /> All tasks
+            <List className="w-4 h-4" /> Tất cả nhiệm vụ
           </button>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 mr-2 text-gray-400">
-            <button className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"><Filter className="w-4 h-4" /></button>
-            <button className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"><ArrowUpDown className="w-4 h-4" /></button>
-            <button className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"><Sparkles className="w-4 h-4" /></button>
-            <button className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"><Search className="w-4 h-4" /></button>
-            <button className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"><SlidersHorizontal className="w-4 h-4" /></button>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm nhiệm vụ..."
+              value={taskSearch}
+              onChange={(e) => setTaskSearch(e.target.value)}
+              className="pl-9 pr-3 py-1.5 text-sm rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
           </div>
           
-          <div className="flex items-center">
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 text-white h-8 rounded-r-none px-3 text-sm font-medium"
-              onClick={() => onCreateTask(projects[0]?.id || '', 'Not Started')}
-            >
-              Mới
-            </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white h-8 rounded-l-none border-l border-blue-700 px-2">
-              <ChevronDown className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 text-sm font-medium"
+            onClick={() => onCreateTask(projects[0]?.id || '', 'Not Started')}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Nhiệm vụ mới
+          </Button>
         </div>
       </div>
 
       <div>
         {activeTab === 'By project' && renderByProjectView()}
         {activeTab === 'Board' && renderBoardView()}
-        {activeTab === 'All tasks' && renderByProjectView()}
+        {activeTab === 'All tasks' && renderAllTasksView()}
       </div>
     </div>
   );
