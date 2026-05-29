@@ -1,6 +1,7 @@
 // ─── API Service Layer ────────────────────────────────────────────────────────
 // Tập trung tất cả HTTP calls đến backend Express server
 
+/// <reference types="vite/client" />
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -243,21 +244,6 @@ export const updateTaskStatus = (id: string, status: string): Promise<Task> =>
 
 export const deleteTask = (id: string): Promise<void> =>
   request<void>(`/api/tasks/${id}`, { method: 'DELETE' });
-
-export interface TaskRecommendation {
-  id: string;
-  name: string;
-  email: string;
-  completedTasks: number;
-  availabilityScore: number;
-}
-
-export interface TaskRecommendationsResponse {
-  task: { id: string; title: string; status?: string };
-  isOverdue: boolean;
-  daysOverdue?: number;
-  recommendations: TaskRecommendation[];
-}
 
 export const getTaskRecommendations = (taskId: string): Promise<TaskRecommendationsResponse> =>
   request<TaskRecommendationsResponse>(`/api/tasks/${taskId}/recommendations`);

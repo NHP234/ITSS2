@@ -103,6 +103,49 @@ const getProgressColor = (progress: number): string => {
   return 'bg-gray-500';
 };
 
+// Storage key for task progress
+const TASK_PROGRESS_STORAGE_KEY = 'taskProgress';
+
+// Helper functions for localStorage
+const saveTaskProgressToLocalStorage = (projectId: string, taskId: string, progress: number) => {
+  try {
+    const storageKey = `${TASK_PROGRESS_STORAGE_KEY}_${projectId}`;
+    const existingData = localStorage.getItem(storageKey);
+    const progressData: Record<string, number> = existingData ? JSON.parse(existingData) : {};
+    progressData[taskId] = progress;
+    localStorage.setItem(storageKey, JSON.stringify(progressData));
+  } catch (error) {
+    console.error('Failed to save progress to localStorage:', error);
+  }
+};
+
+const loadTaskProgressFromLocalStorage = (projectId: string): Record<string, number> => {
+  try {
+    const storageKey = `${TASK_PROGRESS_STORAGE_KEY}_${projectId}`;
+    const existingData = localStorage.getItem(storageKey);
+    return existingData ? JSON.parse(existingData) : {};
+  } catch (error) {
+    console.error('Failed to load progress from localStorage:', error);
+    return {};
+  }
+};
+
+const clearTaskProgressFromLocalStorage = (projectId: string, taskId?: string) => {
+  try {
+    const storageKey = `${TASK_PROGRESS_STORAGE_KEY}_${projectId}`;
+    const existingData = localStorage.getItem(storageKey);
+    if (existingData && taskId) {
+      const progressData: Record<string, number> = JSON.parse(existingData);
+      delete progressData[taskId];
+      localStorage.setItem(storageKey, JSON.stringify(progressData));
+    } else if (existingData && !taskId) {
+      localStorage.removeItem(storageKey);
+    }
+  } catch (error) {
+    console.error('Failed to clear progress from localStorage:', error);
+  }
+};
+
 // Horizontal Progress Bar Component with Number Input
 const HorizontalProgressBar = ({ progress, onChange, taskId, disabled }: { progress: number; onChange: (value: number) => void; taskId: string; disabled?: boolean }) => {
   const [inputValue, setInputValue] = useState<string>(progress.toString());
@@ -190,15 +233,26 @@ export const TaskView = memo(function TaskView({
   const [viewMode, setViewMode] = useState<'board' | 'table'>('board');
   const [taskSearch, setTaskSearch] = useState('');
 
+  // Load saved progress from localStorage on component mount
   const [taskProgress, setTaskProgress] = useState<Record<string, number>>(() => {
+    const savedProgress = loadTaskProgressFromLocalStorage(project.id);
     const initial: Record<string, number> = {};
+    
     tasks.forEach(task => {
-      if (task.status === 'Done') {
+      // Check if we have saved progress for this task
+      if (savedProgress[task.id] !== undefined) {
+        initial[task.id] = savedProgress[task.id];
+      } 
+      // If task is Done in the backend, progress should be 100
+      else if (task.status === 'Done') {
         initial[task.id] = 100;
-      } else {
+      } 
+      // Otherwise default to 0
+      else {
         initial[task.id] = (task as any).progress || 0;
       }
     });
+    
     return initial;
   });
 
@@ -206,26 +260,43 @@ export const TaskView = memo(function TaskView({
     setProjectName(project.name);
   }, [project.name]);
 
+  // Sync progress when tasks change (new tasks added, etc.)
   useEffect(() => {
+    const savedProgress = loadTaskProgressFromLocalStorage(project.id);
     const newProgress: Record<string, number> = {};
+    
     tasks.forEach(task => {
-      if (task.status === 'Done') {
+      if (savedProgress[task.id] !== undefined) {
+        newProgress[task.id] = savedProgress[task.id];
+      } else if (task.status === 'Done') {
         newProgress[task.id] = 100;
-      } else if (taskProgress[task.id] !== undefined) {
+      } else if (taskProgress[task.id] !== undefined && task.status !== 'Done') {
         newProgress[task.id] = taskProgress[task.id];
       } else {
         newProgress[task.id] = (task as any).progress || 0;
       }
     });
+    
     setTaskProgress(prev => ({ ...prev, ...newProgress }));
-  }, [tasks]);
+  }, [tasks, project.id]);
 
   const { totalWeight, doneWeight, localCompletion } = useMemo(() => {
-    const totalW = tasks.reduce((sum, t) => sum + (t.weight || 1), 0);
-    const doneW = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.weight || 1), 0);
-    const localC = totalW > 0 ? Math.round((doneW / totalW) * 100) : 0;
-    return { totalWeight: totalW, doneWeight: doneW, localCompletion: localC };
-  }, [tasks]);
+    // Calculate completion based on actual progress values, not just status
+    let totalWeightedProgress = 0;
+    let totalWeightSum = 0;
+    
+    tasks.forEach(task => {
+      const weight = task.weight || 1;
+      totalWeightSum += weight;
+      
+      const progress = taskProgress[task.id] ?? (task.status === 'Done' ? 100 : 0);
+      totalWeightedProgress += (progress / 100) * weight;
+    });
+    
+    const localC = totalWeightSum > 0 ? Math.round((totalWeightedProgress / totalWeightSum) * 100) : 0;
+    
+    return { totalWeight: totalWeightSum, doneWeight: 0, localCompletion: localC };
+  }, [tasks, taskProgress]);
 
   const handleSearchUsers = async (query: string) => {
     setUserSearch(query);
@@ -328,10 +399,19 @@ export const TaskView = memo(function TaskView({
 
   const handleProgressUpdate = async (taskId: string, newProgress: number) => {
     const clampedProgress = Math.min(100, Math.max(0, newProgress));
+    
+    // Update local state
     setTaskProgress(prev => ({ ...prev, [taskId]: clampedProgress }));
+    
+    // Save to localStorage
+    saveTaskProgressToLocalStorage(project.id, taskId, clampedProgress);
+    
+    // Call external callback if provided
     if (onUpdateTaskProgress) {
       onUpdateTaskProgress(taskId, clampedProgress);
     }
+    
+    // Auto-update status based on progress
     const task = tasks.find(t => t.id === taskId);
     if (task) {
       if (clampedProgress >= 100 && task.status !== 'Done') {
@@ -339,6 +419,8 @@ export const TaskView = memo(function TaskView({
         if (onUpdateTask) {
           await onUpdateTask(taskId, { status: 'Done', progress: 100 } as any);
         }
+        // Save the 100% progress again to ensure it's stored
+        saveTaskProgressToLocalStorage(project.id, taskId, 100);
       } else if (clampedProgress < 100 && task.status === 'Done') {
         onUpdateTaskStatus(taskId, 'In Progress');
         if (onUpdateTask) {
@@ -365,19 +447,29 @@ export const TaskView = memo(function TaskView({
 
   const handleMoveTask = (taskId: string, newStatus: TaskStatus) => {
     if (newStatus === 'Done') {
+      // When moving to Done, set progress to 100 and save
       setTaskProgress(prev => ({ ...prev, [taskId]: 100 }));
+      saveTaskProgressToLocalStorage(project.id, taskId, 100);
       if (onUpdateTaskProgress) {
         onUpdateTaskProgress(taskId, 100);
       }
     }
     const currentProgress = taskProgress[taskId];
     if (newStatus !== 'Done' && currentProgress === 100) {
+      // When moving away from Done, set progress to 0 and save
       setTaskProgress(prev => ({ ...prev, [taskId]: 0 }));
+      saveTaskProgressToLocalStorage(project.id, taskId, 0);
       if (onUpdateTaskProgress) {
         onUpdateTaskProgress(taskId, 0);
       }
     }
     onUpdateTaskStatus(taskId, newStatus);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    // Remove progress from localStorage when task is deleted
+    clearTaskProgressFromLocalStorage(project.id, taskId);
+    onDeleteTask(taskId);
   };
 
   const filteredTasks = useMemo(() => {
@@ -735,7 +827,7 @@ export const TaskView = memo(function TaskView({
                                   onChange={(e) => onUpdateTask?.(task.id, { title: e.target.value })}
                                   className={`bg-transparent border-none outline-none flex-1 cursor-text font-medium ${isOverdue ? 'text-red-200' : 'text-white'}`}
                                 />
-                                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all" onClick={() => onDeleteTask(task.id)}>
+                                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleDeleteTask(task.id)}>
                                   <Trash2 className="w-3 h-3" />
                                 </Button>
                               </div>
@@ -1012,7 +1104,7 @@ export const TaskView = memo(function TaskView({
                               <button onClick={() => handleTaskClick(task.id)} className="p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded transition-colors" title="Xem chi tiết">
                                 <Maximize2 className="w-4 h-4" />
                               </button>
-                              <button onClick={() => onDeleteTask(task.id)} className="p-1 text-gray-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors" title="Xoá">
+                              <button onClick={() => handleDeleteTask(task.id)} className="p-1 text-gray-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors" title="Xoá">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
