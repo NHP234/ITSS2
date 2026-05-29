@@ -37,20 +37,26 @@ export interface User {
   email: string;
 }
 
+export type TaskStatus = 'Not Started' | 'In Progress' | 'Reviewing' | 'Done';
+export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Very High' | '';
+
 export interface Task {
   id: string;
   title: string;
-  status: 'Not Started' | 'In Progress' | 'Done';
+  status: TaskStatus;
   projectId: string;
   assignee?: string;
   due?: string;
-  priority?: string;
+  dueDate?: string;
+  priority?: TaskPriority | string;
   summary?: string;
   icon?: string;
   weight?: number;
+  progress?: number;
   createdAt?: string;
   updatedAt?: string;
   assignees?: User[];
+  project?: { id: string; name: string; icon: string };
 }
 
 export interface Notification {
@@ -62,6 +68,22 @@ export interface Notification {
   read: boolean;
   link?: string;
   createdAt: string;
+}
+
+export interface MemberStat {
+  member: User;
+  totalAssigned: number;
+  done: number;
+  overdue: number;
+  inProgress: number;
+  completionRate: number;
+}
+
+export interface ProjectContribution {
+  projectId: string;
+  projectName: string;
+  projectIcon: string;
+  members: MemberStat[];
 }
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
@@ -192,6 +214,9 @@ export const getTasks = (projectId?: string): Promise<Task[]> => {
 export const getProjectTasks = (projectId: string): Promise<Task[]> =>
   request<Task[]>(`/api/projects/${projectId}/tasks`);
 
+export const getOverdueTasks = (): Promise<Task[]> =>
+  request<Task[]>('/api/tasks/overdue');
+
 export const createTask = (data: Partial<Task>): Promise<Task> =>
   request<Task>('/api/tasks', {
     method: 'POST',
@@ -210,6 +235,12 @@ export const updateTaskStatus = (id: string, status: string): Promise<Task> =>
     body: JSON.stringify({ status }),
   });
 
+export const updateTaskProgress = (id: string, progress: number): Promise<Task> =>
+  request<Task>(`/api/tasks/${id}/progress`, {
+    method: 'PATCH',
+    body: JSON.stringify({ progress }),
+  });
+
 export const deleteTask = (id: string): Promise<void> =>
   request<void>(`/api/tasks/${id}`, { method: 'DELETE' });
 
@@ -223,6 +254,11 @@ export const markNotificationRead = (id: string): Promise<Notification> =>
 
 export const markAllNotificationsRead = (): Promise<void> =>
   request<void>('/api/notifications/mark-all-read', { method: 'POST' });
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export const getMemberContributions = (): Promise<ProjectContribution[]> =>
+  request<ProjectContribution[]>('/api/dashboard/contributions');
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 

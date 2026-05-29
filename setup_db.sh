@@ -1,10 +1,11 @@
 #!/bin/bash
 
+echo "🚀 Đang khởi động Docker container cho Database..."
+docker-compose up -d db
+
 # Di chuyển vào thư mục backend
 cd backend
 
-echo "🚀 Đang khởi động Docker container cho Database..."
-docker-compose up -d
 
 echo "⏳ Đang đợi Database sẵn sàng..."
 # Đợi 5 giây để Postgres khởi động hoàn toàn

@@ -1,11 +1,11 @@
 import { useState, useEffect, memo, useMemo } from 'react';
-import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Trash2, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { Plus, Target, Users, Calendar, ChevronDown, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, Check, Maximize2, Zap, Trash2, Link as LinkIcon, ExternalLink, AlertTriangle, TrendingUp, Award } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import { CustomDatePicker } from '../components/common/CustomDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Search as SearchIcon, X, UserPlus, CheckCircle2 } from 'lucide-react';
-import { searchUsers, addProjectMember, removeProjectMember, updateTask } from '../api';
+import { searchUsers, addProjectMember, removeProjectMember, getMemberContributions } from '../api';
+import type { ProjectContribution } from '../api';
 
 import { type Project, type Task } from '../api';
 
@@ -23,6 +23,69 @@ interface TaskViewProps {
   onRemoveLink?: (projectId: string, linkId: string) => void;
 }
 
+// ─── Priority badge ───────────────────────────────────────────────────────────
+function PriorityBadge({ priority }: { priority?: string }) {
+  if (!priority) return null;
+  const map: Record<string, { label: string; cls: string }> = {
+    'Very High': { label: 'Very High', cls: 'bg-purple-900/80 text-purple-100 border-purple-700' },
+    'High':      { label: 'High',      cls: 'bg-red-900/80 text-red-100 border-red-700' },
+    'Medium':    { label: 'Medium',    cls: 'bg-orange-900/80 text-orange-100 border-orange-700' },
+    'Low':       { label: 'Low',       cls: 'bg-green-900/80 text-green-100 border-green-700' },
+  };
+  const cfg = map[priority];
+  if (!cfg) return <span className="text-[10px] text-gray-500 px-1.5 py-0.5 rounded border border-gray-700 bg-gray-800">{priority}</span>;
+  return (
+    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+// ─── Check if task is overdue ─────────────────────────────────────────────────
+function isOverdue(task: Task): boolean {
+  if (task.status === 'Done') return false;
+  if (task.dueDate) return new Date(task.dueDate) < new Date();
+  // Fallback: parse due string "d tháng m, yyyy"
+  if (task.due) {
+    const match = task.due.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/i);
+    if (match) {
+      const [_, d, m, y] = match;
+      const due = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 23, 59, 59);
+      return due < new Date();
+    }
+  }
+  return false;
+}
+
+const STATUSES = ['Not Started', 'In Progress', 'Reviewing', 'Done'] as const;
+
+const STATUS_CONFIG = {
+  'Not Started': {
+    dot: 'bg-gray-400',
+    badge: 'bg-gray-500/20 text-gray-300',
+    border: 'text-gray-300 border-gray-700 hover:bg-gray-800/50',
+    addBtn: 'text-gray-400 border-blue-900/60 hover:bg-gray-900/20',
+  },
+  'In Progress': {
+    dot: 'bg-blue-400',
+    badge: 'bg-blue-500/20 text-blue-200',
+    border: 'text-blue-400 border-blue-900/60 hover:bg-blue-900/20',
+    addBtn: 'text-blue-400 border-blue-900/60 hover:bg-blue-900/20',
+  },
+  'Reviewing': {
+    dot: 'bg-amber-400',
+    badge: 'bg-amber-500/20 text-amber-200',
+    border: 'text-amber-400 border-amber-900/60 hover:bg-amber-900/20',
+    addBtn: 'text-amber-400 border-amber-900/60 hover:bg-amber-900/20',
+  },
+  'Done': {
+    dot: 'bg-green-400',
+    badge: 'bg-green-500/20 text-green-200',
+    border: 'text-green-400 border-green-900/60 hover:bg-green-900/20',
+    addBtn: 'text-green-400 border-green-900/60 hover:bg-green-900/20',
+  },
+};
+
 export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreateTask, onUpdateTaskStatus, onUpdateTask, onDeleteTask, onUpdateProject, onDeleteProject, onAddLink, onRemoveLink }: TaskViewProps) {
   const [projectName, setProjectName] = useState(project.name);
   const [newLinkTitle, setNewLinkTitle] = useState('');
@@ -31,78 +94,81 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
   const [userSearch, setUserSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [showContributions, setShowContributions] = useState(false);
+  const [contributions, setContributions] = useState<ProjectContribution | null>(null);
+  const [loadingContributions, setLoadingContributions] = useState(false);
 
   useEffect(() => {
     setProjectName(project.name);
   }, [project.name]);
 
-  const { totalWeight, doneWeight, localCompletion } = useMemo(() => {
+  const { localCompletion } = useMemo(() => {
     const totalW = tasks.reduce((sum, t) => sum + (t.weight || 1), 0);
     const doneW = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.weight || 1), 0);
     const localC = totalW > 0 ? Math.round((doneW / totalW) * 100) : 0;
-    return { totalWeight: totalW, doneWeight: doneW, localCompletion: localC };
+    return { localCompletion: localC };
   }, [tasks]);
+
+  const overdueCount = useMemo(() => tasks.filter(isOverdue).length, [tasks]);
+
+  const tasksByStatus = useMemo(() => {
+    const map: Record<string, Task[]> = { 'Not Started': [], 'In Progress': [], 'Reviewing': [], 'Done': [] };
+    tasks.forEach(t => {
+      if (map[t.status]) map[t.status].push(t);
+      else map['Not Started'].push(t);
+    });
+    return map;
+  }, [tasks]);
+
+  const fetchContributions = async () => {
+    if (contributions) { setShowContributions(v => !v); return; }
+    setLoadingContributions(true);
+    try {
+      const all = await getMemberContributions();
+      const found = all.find(p => p.projectId === project.id) || null;
+      setContributions(found);
+      setShowContributions(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingContributions(false);
+    }
+  };
 
   const handleSearchUsers = async (query: string) => {
     setUserSearch(query);
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
+    if (query.length < 2) { setSearchResults([]); return; }
     setIsSearching(true);
     try {
       const results = await searchUsers(query);
-      // Lọc bỏ những người đã là thành viên
-      const filtered = results.filter(u => !project.members?.some(m => m.id === u.id));
-      setSearchResults(filtered);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSearching(false);
-    }
+      setSearchResults(results.filter(u => !project.members?.some(m => m.id === u.id)));
+    } catch (err) { console.error(err); }
+    finally { setIsSearching(false); }
   };
 
   const handleAddMember = async (userId: string) => {
     try {
       const updatedProject = await addProjectMember(project.id, userId);
-      if (onUpdateProject) {
-        onUpdateProject(project.id, { members: updatedProject.members });
-      }
-      setUserSearch('');
-      setSearchResults([]);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Lỗi khi thêm thành viên');
-    }
+      onUpdateProject?.(project.id, { members: updatedProject.members });
+      setUserSearch(''); setSearchResults([]);
+    } catch (err) { alert(err instanceof Error ? err.message : 'Lỗi khi thêm thành viên'); }
   };
 
   const handleRemoveMember = async (userId: string) => {
     try {
       const updatedProject = await removeProjectMember(project.id, userId);
-      if (onUpdateProject) {
-        onUpdateProject(project.id, { members: updatedProject.members });
-      }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Lỗi khi xoá thành viên');
-    }
+      onUpdateProject?.(project.id, { members: updatedProject.members });
+    } catch (err) { alert(err instanceof Error ? err.message : 'Lỗi khi xoá thành viên'); }
   };
 
   const handleToggleAssignee = async (taskId: string, userId: string, isAssigned: boolean) => {
     if (!onUpdateTask) return;
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-
     let newAssigneeIds = task.assignees?.map(a => a.id) || [];
-    if (isAssigned) {
-      newAssigneeIds = newAssigneeIds.filter(id => id !== userId);
-    } else {
-      newAssigneeIds = [...newAssigneeIds, userId];
-    }
-
-    try {
-      await onUpdateTask(taskId, { assigneeIds: newAssigneeIds } as any);
-    } catch (err) {
-      console.error(err);
-    }
+    newAssigneeIds = isAssigned ? newAssigneeIds.filter(id => id !== userId) : [...newAssigneeIds, userId];
+    try { await onUpdateTask(taskId, { assigneeIds: newAssigneeIds } as any); }
+    catch (err) { console.error(err); }
   };
 
   const handleNameBlur = () => {
@@ -110,27 +176,10 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
       onUpdateProject(project.id, { name: projectName });
     }
   };
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Planning':
-        return 'bg-blue-600';
-      case 'In Progress':
-        return 'bg-yellow-600';
-      case 'Done':
-        return 'bg-green-600';
-      default:
-        return 'bg-gray-600';
-    }
-  };
-
-  const tasksByStatus = useMemo(() => ({
-    'Not Started': tasks.filter(t => t.status === 'Not Started'),
-    'In Progress': tasks.filter(t => t.status === 'In Progress'),
-    'Done': tasks.filter(t => t.status === 'Done'),
-  }), [tasks]);
 
   return (
     <div className="min-h-full bg-[#191919] text-white">
+      {/* ── Project Header ── */}
       <div className="px-8 py-6 space-y-6 flex-shrink-0">
         <div className="flex flex-col gap-2">
           <Target className="w-8 h-8 text-gray-400 mb-2" />
@@ -141,20 +190,19 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
               onBlur={handleNameBlur}
               className="text-4xl font-bold font-sans tracking-tight border-b-2 border-dashed border-gray-600 pb-1 flex-1 bg-transparent outline-none focus:border-gray-400 transition-colors"
             />
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost" size="sm"
               className="text-gray-500 hover:text-red-400 ml-4 h-9 w-9 p-0"
               onClick={() => onDeleteProject?.(project.id)}
             >
               <Trash2 className="w-5 h-5" />
             </Button>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="mt-4 flex items-center gap-4">
             <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-blue-500 transition-all duration-500 ease-out"
                 style={{ width: `${localCompletion}%` }}
               />
@@ -163,14 +211,20 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
               <span className="text-2xl font-bold text-white">{localCompletion}%</span>
               <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Hoàn thành</span>
             </div>
+            {overdueCount > 0 && (
+              <div className="flex items-center gap-1.5 bg-red-900/30 border border-red-700/50 px-2.5 py-1 rounded-full">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                <span className="text-xs text-red-300 font-bold">{overdueCount} quá hạn</span>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Project Meta */}
         <div className="space-y-3 mt-8">
           <div className="grid grid-cols-[140px_1fr] gap-4 text-sm items-center">
             <div className="flex items-center gap-2 text-gray-400">
-              <Sparkles className="w-4 h-4" />
-              <span>Status</span>
+              <Sparkles className="w-4 h-4" /><span>Status</span>
             </div>
             <div>
               <div className="inline-flex items-center gap-1.5 bg-[#2563EB]/40 border border-[#2563EB]/50 px-3 py-0.5 rounded-full">
@@ -180,8 +234,7 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
             </div>
 
             <div className="flex items-center gap-2 text-gray-400">
-              <Users className="w-4 h-4" />
-              <span>Owner</span>
+              <Users className="w-4 h-4" /><span>Owner</span>
             </div>
             <div className="text-gray-400 flex items-center gap-2">
               {project.owner || 'Trống'}
@@ -227,7 +280,7 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
                   <div className="p-2 border-t border-gray-800 bg-[#252525]/30">
                     <div className="relative">
                       <SearchIcon className="absolute left-2 top-2 w-3 h-3 text-gray-500" />
-                      <input 
+                      <input
                         className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md py-1.5 pl-7 pr-2 text-xs outline-none focus:border-blue-500"
                         placeholder="Tìm theo email hoặc tên..."
                         value={userSearch}
@@ -237,8 +290,8 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
                     {searchResults.length > 0 && (
                       <div className="mt-2 space-y-1">
                         {searchResults.map(u => (
-                          <button 
-                            key={u.id} 
+                          <button
+                            key={u.id}
                             onClick={() => handleAddMember(u.id)}
                             className="w-full flex items-center gap-2 p-1.5 hover:bg-blue-600 rounded text-left transition-colors"
                           >
@@ -257,11 +310,10 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
             </div>
 
             <div className="flex items-center gap-2 text-gray-400">
-              <Calendar className="w-4 h-4" />
-              <span>Dates</span>
+              <Calendar className="w-4 h-4" /><span>Dates</span>
             </div>
             <div>
-              <CustomDatePicker 
+              <CustomDatePicker
                 trigger={
                   <button className="text-gray-400 hover:text-gray-300 hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors">
                     {project.dates || 'Trống'}
@@ -280,44 +332,95 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
               />
             </div>
           </div>
+        </div>
 
-          <button className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-400 pt-2">
-            <ChevronDown className="w-4 h-4" />
-            Thêm 5 thuộc tính
+        {/* ── Member Contributions Section ── */}
+        <div className="pt-4 border-t border-gray-800">
+          <button
+            onClick={fetchContributions}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white transition-colors group"
+          >
+            <Award className="w-5 h-5 text-blue-400 group-hover:text-blue-300" />
+            Đóng góp thành viên
+            {loadingContributions && <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin ml-1" />}
+            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showContributions ? 'rotate-180' : ''}`} />
           </button>
+
+          {showContributions && contributions && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="py-2 pr-4 text-left font-bold">Thành viên</th>
+                    <th className="py-2 px-3 text-center font-bold">Giao việc</th>
+                    <th className="py-2 px-3 text-center font-bold">Hoàn thành</th>
+                    <th className="py-2 px-3 text-center font-bold">Quá hạn</th>
+                    <th className="py-2 px-3 text-left font-bold w-36">Tiến độ</th>
+                    <th className="py-2 px-3 text-center font-bold">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contributions.members.map(({ member, totalAssigned, done, overdue, completionRate }) => {
+                    const status = overdue > 0 ? 'at-risk' : completionRate >= 80 ? 'on-track' : 'behind';
+                    return (
+                      <tr key={member.id} className="border-b border-gray-800/50 hover:bg-[#222]">
+                        <td className="py-2.5 pr-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-[11px] font-bold">
+                              {member.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-200 text-xs">{member.name}</div>
+                              <div className="text-[10px] text-gray-500">{member.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center text-gray-300 font-mono text-xs">{totalAssigned}</td>
+                        <td className="py-2.5 px-3 text-center text-green-400 font-mono text-xs">{done}</td>
+                        <td className="py-2.5 px-3 text-center">
+                          {overdue > 0 ? (
+                            <span className="text-red-400 font-bold font-mono text-xs">{overdue}</span>
+                          ) : (
+                            <span className="text-gray-600 font-mono text-xs">0</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${completionRate >= 80 ? 'bg-green-500' : completionRate >= 40 ? 'bg-blue-500' : 'bg-orange-500'}`}
+                                style={{ width: `${completionRate}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-gray-400 w-7 text-right">{completionRate}%</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {status === 'on-track' && <span className="text-[10px] bg-green-900/50 text-green-300 border border-green-700/50 px-2 py-0.5 rounded-full">On track</span>}
+                          {status === 'behind' && <span className="text-[10px] bg-blue-900/50 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded-full">Behind</span>}
+                          {status === 'at-risk' && <span className="text-[10px] bg-red-900/50 text-red-300 border border-red-700/50 px-2 py-0.5 rounded-full">At risk ⚠️</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {showContributions && !contributions && !loadingContributions && (
+            <p className="text-xs text-gray-500 mt-2 italic">Chưa có dữ liệu đóng góp cho dự án này.</p>
+          )}
         </div>
 
-        <div className="space-y-6 pt-6 border-t border-gray-800">
-          <div>
-            <p className="text-sm font-semibold text-gray-300 mb-2">Quan hệ</p>
-            <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-300">
-              <div className="w-4 h-4 rounded-full border border-gray-500 flex items-center justify-center">
-                <Check className="w-3 h-3" />
-              </div>
-              Thêm Tasks
-            </button>
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-gray-300 mb-2">Bình luận</p>
-            <button className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-400 group">
-              <div className="w-6 h-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xs text-gray-300">
-                B
-              </div>
-              <span className="border-b border-transparent group-hover:border-gray-500">Thêm bình luận...</span>
-            </button>
-          </div>
-        </div>
-
+        {/* Links */}
         <div className="space-y-4 pt-4 border-t border-gray-800">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-200">
               <LinkIcon className="w-5 h-5 text-blue-400" />
               Links & Tài liệu
             </h3>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost" size="sm"
               className="text-xs text-blue-400 hover:text-blue-300 h-8"
               onClick={() => setIsAddingLink(!isAddingLink)}
             >
@@ -329,7 +432,7 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
             <div className="bg-[#222] border border-gray-700 rounded-lg p-3 space-y-3">
               <div className="space-y-1.5">
                 <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Tiêu đề</label>
-                <input 
+                <input
                   className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md px-3 py-1.5 text-sm outline-none focus:border-blue-500"
                   placeholder="VD: Repo dự án, Figma..."
                   value={newLinkTitle}
@@ -338,22 +441,20 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">URL</label>
-                <input 
+                <input
                   className="w-full bg-[#1a1a1a] border border-gray-700 rounded-md px-3 py-1.5 text-sm outline-none focus:border-blue-500"
                   placeholder="https://..."
                   value={newLinkUrl}
                   onChange={(e) => setNewLinkUrl(e.target.value)}
                 />
               </div>
-              <Button 
+              <Button
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white h-9"
                 disabled={!newLinkTitle || !newLinkUrl}
                 onClick={() => {
                   if (onAddLink) {
                     onAddLink(project.id, newLinkTitle, newLinkUrl);
-                    setNewLinkTitle('');
-                    setNewLinkUrl('');
-                    setIsAddingLink(false);
+                    setNewLinkTitle(''); setNewLinkUrl(''); setIsAddingLink(false);
                   }
                 }}
               >
@@ -366,12 +467,7 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
             {project.links && project.links.length > 0 ? (
               project.links.map(link => (
                 <div key={link.id} className="group flex items-center justify-between bg-[#222] hover:bg-[#2a2a2a] border border-gray-800 rounded-lg p-3 transition-all">
-                  <a 
-                    href={link.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 flex-1 min-w-0"
-                  >
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
                       <ExternalLink className="w-4 h-4 text-blue-400" />
                     </div>
@@ -380,10 +476,7 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
                       <span className="text-[10px] text-gray-500 truncate">{link.url}</span>
                     </div>
                   </a>
-                  <button 
-                    onClick={() => onRemoveLink?.(project.id, link.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 transition-opacity"
-                  >
+                  <button onClick={() => onRemoveLink?.(project.id, link.id)} className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 transition-opacity">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -397,53 +490,33 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
         </div>
       </div>
 
+      {/* ── Task Board ── */}
       <div className="flex-shrink-0 border-t border-gray-800">
         <div className="px-8 py-6">
           <h2 className="text-xl mb-4">Project tasks</h2>
 
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-800">
             <Button variant="ghost" size="sm" className="bg-[#333333] text-white hover:bg-[#444444] rounded-full px-4">
-              <LayoutGrid className="w-4 h-4 mr-2" />
-              Board
+              <LayoutGrid className="w-4 h-4 mr-2" />Board
             </Button>
             <Button variant="ghost" size="sm" className="text-gray-400 hover:bg-gray-800 hover:text-white rounded-full px-4">
-              <List className="w-4 h-4 mr-2" />
-              Tasks
+              <List className="w-4 h-4 mr-2" />Tasks
             </Button>
-
             <div className="flex-1" />
-
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="w-8 h-8 text-blue-400 hover:bg-gray-800 hover:text-blue-300">
-                <Filter className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                <ArrowUpDown className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                <Zap className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8 text-blue-400 hover:bg-gray-800 hover:text-blue-300">
-                <Sparkles className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                <Search className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                <Maximize2 className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800 hover:text-white">
-                <SlidersHorizontal className="w-4 h-4" />
-              </Button>
-              
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-blue-400 hover:bg-gray-800"><Filter className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800"><ArrowUpDown className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800"><Search className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800"><Maximize2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:bg-gray-800"><SlidersHorizontal className="w-4 h-4" /></Button>
               <div className="flex items-center ml-2 rounded-md overflow-hidden bg-blue-600">
-                <button 
+                <button
                   className="px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
                   onClick={() => onCreateTask(project.id, 'Not Started')}
                 >
                   Mới
                 </button>
-                <div className="w-px h-full bg-blue-500/50"></div>
+                <div className="w-px h-full bg-blue-500/50" />
                 <button className="px-2 py-1.5 text-white hover:bg-blue-700 transition-colors">
                   <ChevronDown className="w-4 h-4" />
                 </button>
@@ -451,136 +524,183 @@ export const TaskView = memo(function TaskView({ project, tasks, onBack, onCreat
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            {Object.entries(tasksByStatus).map(([status, statusTasks]) => {
-              const isNotStarted = status === 'Not Started';
-              const isInProgress = status === 'In Progress';
-              const isDone = status === 'Done';
-
+          {/* 4-column Kanban */}
+          <div className="grid grid-cols-4 gap-4">
+            {STATUSES.map((status) => {
+              const cfg = STATUS_CONFIG[status];
+              const statusTasks = tasksByStatus[status] || [];
               return (
                 <div key={status} className="flex flex-col bg-[#222] rounded-xl p-3 border border-gray-800/40">
                   <div className="mb-3">
-                    <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-sm font-medium ${
-                      isNotStarted ? 'bg-gray-500/20 text-gray-300' :
-                      isInProgress ? 'bg-blue-500/20 text-blue-200' :
-                      'bg-green-500/20 text-green-200'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${
-                        isNotStarted ? 'bg-gray-400' :
-                        isInProgress ? 'bg-blue-400' :
-                        'bg-green-400'
-                      }`} />
+                    <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-sm font-medium ${cfg.badge}`}>
+                      <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                       {status}
+                      <span className="text-[10px] opacity-60 font-normal">({statusTasks.length})</span>
                     </div>
                   </div>
 
                   <div className="space-y-2 flex-1">
-                    {statusTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="bg-[#1a1a1a] rounded-lg p-3 text-sm hover:bg-[#252525] shadow-sm border border-gray-800/50 focus-within:ring-1 focus-within:ring-gray-600 transition-shadow space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <input
-                            value={task.title}
-                            onChange={(e) => onUpdateTask?.(task.id, { title: e.target.value })}
-                            className="bg-transparent border-none outline-none flex-1 text-white cursor-text font-medium"
-                          />
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-gray-600 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all"
-                            onClick={() => onDeleteTask(task.id)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CustomDatePicker 
-                            trigger={
-                              <button className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 transition-colors">
-                                <Calendar className="w-3 h-3" />
-                                {task.due || 'Thêm ngày'}
-                              </button>
-                            }
-                            onSelect={(date) => {
-                              if (date && onUpdateTask) {
-                                const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
-                                onUpdateTask(task.id, { due: formattedDate });
+                    {statusTasks.map((task) => {
+                      const overdue = isOverdue(task);
+                      return (
+                        <div
+                          key={task.id}
+                          className={`bg-[#1a1a1a] rounded-lg p-3 text-sm hover:bg-[#252525] shadow-sm border transition-shadow space-y-2 group ${
+                            overdue
+                              ? 'border-red-800/60 bg-red-950/10 hover:bg-red-950/20'
+                              : 'border-gray-800/50 focus-within:ring-1 focus-within:ring-gray-600'
+                          }`}
+                        >
+                          {/* Title row */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                              {overdue && <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />}
+                              <input
+                                value={task.title}
+                                onChange={(e) => onUpdateTask?.(task.id, { title: e.target.value })}
+                                className="bg-transparent border-none outline-none flex-1 text-white cursor-text font-medium truncate"
+                              />
+                            </div>
+                            <Button
+                              variant="ghost" size="sm"
+                              className="text-gray-600 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all"
+                              onClick={() => onDeleteTask(task.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+
+                          {/* Priority + Due row */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <PriorityBadge priority={task.priority} />
+                            <CustomDatePicker
+                              trigger={
+                                <button className={`flex items-center gap-1.5 text-[11px] transition-colors ${overdue ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-gray-300'}`}>
+                                  <Calendar className="w-3 h-3" />
+                                  {task.due || 'Thêm ngày'}
+                                </button>
                               }
-                            }}
-                          />
-                          <div className="flex items-center gap-1 bg-gray-800/50 px-1.5 py-0.5 rounded border border-gray-700/50">
-                            <span className="text-[10px] text-gray-500 font-medium">Weight</span>
-                            <input 
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={task.weight || 1}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                if (!isNaN(val) && onUpdateTask) {
-                                  onUpdateTask(task.id, { weight: val });
+                              onSelect={(date) => {
+                                if (date && onUpdateTask) {
+                                  const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+                                  onUpdateTask(task.id, { due: formattedDate });
                                 }
                               }}
-                              className="w-8 bg-transparent text-[10px] text-blue-400 font-bold outline-none border-none p-0 text-center"
+                            />
+                            <div className="flex items-center gap-1 bg-gray-800/50 px-1.5 py-0.5 rounded border border-gray-700/50">
+                              <span className="text-[10px] text-gray-500 font-medium">W</span>
+                              <input
+                                type="number" min="1" max="100"
+                                value={task.weight || 1}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (!isNaN(val) && onUpdateTask) onUpdateTask(task.id, { weight: val });
+                                }}
+                                className="w-7 bg-transparent text-[10px] text-blue-400 font-bold outline-none border-none p-0 text-center"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-gray-500">Tiến độ</span>
+                              <span className="text-[10px] text-blue-400 font-bold">{task.progress ?? 0}%</span>
+                            </div>
+                            <div className="relative h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  (task.progress ?? 0) >= 100 ? 'bg-green-500' :
+                                  (task.progress ?? 0) >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+                                }`}
+                                style={{ width: `${task.progress ?? 0}%` }}
+                              />
+                            </div>
+                            <input
+                              type="range" min="0" max="100"
+                              value={task.progress ?? 0}
+                              onChange={(e) => {
+                                if (onUpdateTask) onUpdateTask(task.id, { progress: parseInt(e.target.value) });
+                              }}
+                              className="w-full h-1 accent-blue-500 cursor-pointer"
                             />
                           </div>
-                          <div className="flex-1" />
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button className="flex -space-x-1 hover:bg-gray-800 p-0.5 rounded transition-colors">
-                                {task.assignees && task.assignees.length > 0 ? (
-                                  task.assignees.map(a => (
-                                    <div key={a.id} className="w-5 h-5 rounded-full bg-blue-600 border border-[#1a1a1a] flex items-center justify-center text-[8px] font-bold" title={a.name}>
-                                      {a.name.charAt(0).toUpperCase()}
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="w-5 h-5 rounded-full border border-dashed border-gray-600 flex items-center justify-center text-gray-500">
-                                    <Users className="w-3 h-3" />
-                                  </div>
-                                )}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
-                              <div className="p-2 border-b border-gray-800 mb-1">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">Gán cho...</span>
-                              </div>
-                              {project.members?.map(m => {
-                                const isAssigned = task.assignees?.some(a => a.id === m.id);
-                                return (
-                                  <button 
-                                    key={m.id} 
-                                    onClick={() => handleToggleAssignee(task.id, m.id, !!isAssigned)}
-                                    className="w-full flex items-center justify-between p-2 hover:bg-gray-800 rounded transition-colors group"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
-                                        {m.name.charAt(0).toUpperCase()}
+
+                          {/* Assignees */}
+                          <div className="flex items-center justify-between">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className="flex -space-x-1 hover:bg-gray-800 p-0.5 rounded transition-colors">
+                                  {task.assignees && task.assignees.length > 0 ? (
+                                    task.assignees.map(a => (
+                                      <div key={a.id} className="w-5 h-5 rounded-full bg-blue-600 border border-[#1a1a1a] flex items-center justify-center text-[8px] font-bold" title={a.name}>
+                                        {a.name.charAt(0).toUpperCase()}
                                       </div>
-                                      <span className="text-xs text-gray-300">{m.name}</span>
+                                    ))
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full border border-dashed border-gray-600 flex items-center justify-center text-gray-500">
+                                      <Users className="w-3 h-3" />
                                     </div>
-                                    {isAssigned && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
+                                  )}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
+                                <div className="p-2 border-b border-gray-800 mb-1">
+                                  <span className="text-[10px] font-bold text-gray-500 uppercase">Gán cho...</span>
+                                </div>
+                                {project.members?.map(m => {
+                                  const isAssigned = task.assignees?.some(a => a.id === m.id);
+                                  return (
+                                    <button
+                                      key={m.id}
+                                      onClick={() => handleToggleAssignee(task.id, m.id, !!isAssigned)}
+                                      className="w-full flex items-center justify-between p-2 hover:bg-gray-800 rounded transition-colors"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
+                                          {m.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <span className="text-xs text-gray-300">{m.name}</span>
+                                      </div>
+                                      {isAssigned && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
+                                    </button>
+                                  );
+                                })}
+                                {(!project.members || project.members.length === 0) && (
+                                  <div className="p-3 text-[10px] text-gray-500 text-center italic">Hãy thêm thành viên vào dự án trước</div>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+
+                            {/* Status change dropdown */}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.badge || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
+                                  {task.status}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-40 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
+                                {STATUSES.map(s => (
+                                  <button
+                                    key={s}
+                                    onClick={() => onUpdateTaskStatus(task.id, s)}
+                                    className={`w-full flex items-center gap-2 p-2 hover:bg-gray-800 rounded text-xs transition-colors ${task.status === s ? 'opacity-50 cursor-default' : ''}`}
+                                  >
+                                    <div className={`w-2 h-2 rounded-full ${STATUS_CONFIG[s].dot}`} />
+                                    {s}
+                                    {task.status === s && <Check className="w-3 h-3 ml-auto text-blue-400" />}
                                   </button>
-                                );
-                              })}
-                              {(!project.members || project.members.length === 0) && (
-                                <div className="p-3 text-[10px] text-gray-500 text-center italic">Hãy thêm thành viên vào dự án trước</div>
-                              )}
-                            </PopoverContent>
-                          </Popover>
+                                ))}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     <button
                       onClick={() => onCreateTask(project.id, status)}
-                      className={`w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-2 transition-colors border ${
-                        isNotStarted ? 'text-gray-300 border-gray-700 hover:bg-gray-800/50' :
-                        isInProgress ? 'text-blue-400 border-blue-900/60 hover:bg-blue-900/20' :
-                        'text-green-400 border-green-900/60 hover:bg-green-900/20'
-                      }`}
+                      className={`w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-2 transition-colors border ${cfg.border}`}
                     >
                       <Plus className="w-4 h-4" />
                       Nhiệm vụ mới

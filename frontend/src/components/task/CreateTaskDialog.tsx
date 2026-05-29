@@ -16,12 +16,13 @@ interface CreateTaskDialogProps {
 
 export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTaskDialogProps) {
   const [title, setTitle] = useState('Task');
-  const [status, setStatus] = useState<'Not Started' | 'In Progress' | 'Done'>('Not Started');
+  const [status, setStatus] = useState<'Not Started' | 'In Progress' | 'Reviewing' | 'Done'>('Not Started');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [priority, setPriority] = useState('');
   const [due, setDue] = useState('');
   const [summary, setSummary] = useState('');
   const [weight, setWeight] = useState(1);
+  const [progress, setProgress] = useState(0);
   
   // Search users state (from main branch)
   const [userSearch, setUserSearch] = useState('');
@@ -56,7 +57,8 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
         priority,
         due,
         summary,
-        weight
+        weight,
+        progress,
       });
       setTitle('Task');
       setStatus('Not Started');
@@ -65,6 +67,7 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
       setDue('');
       setSummary('');
       setWeight(1);
+      setProgress(0);
       onClose();
     }
   };
@@ -156,21 +159,25 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
                     <Popover>
                       <PopoverTrigger asChild>
                         <button type="button" className="inline-flex items-center gap-1.5 bg-[#444] border border-[#555] px-3 py-0.5 rounded-full">
-                          <div className={`w-2 h-2 rounded-full ${status === 'Done' ? 'bg-green-400' : (status === 'In Progress' ? 'bg-blue-400' : 'bg-gray-400')}`} />
+                          <div className={`w-2 h-2 rounded-full ${status === 'Done' ? 'bg-green-400' : status === 'Reviewing' ? 'bg-amber-400' : status === 'In Progress' ? 'bg-blue-400' : 'bg-gray-400'}`} />
                           <span className="text-xs text-white font-medium">{status}</span>
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-40 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
-                        {(['Not Started', 'In Progress', 'Done'] as const).map(s => (
-                          <button 
-                            key={s} 
-                            type="button"
-                            onClick={() => setStatus(s)}
-                            className="w-full text-left p-2 hover:bg-gray-800 rounded text-xs transition-colors"
-                          >
-                            {s}
-                          </button>
-                        ))}
+                      <PopoverContent className="w-44 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
+                        {(['Not Started', 'In Progress', 'Reviewing', 'Done'] as const).map(s => {
+                          const dotColor = s === 'Done' ? 'bg-green-400' : s === 'Reviewing' ? 'bg-amber-400' : s === 'In Progress' ? 'bg-blue-400' : 'bg-gray-400';
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setStatus(s)}
+                              className="w-full text-left p-2 hover:bg-gray-800 rounded text-xs transition-colors flex items-center gap-2"
+                            >
+                              <div className={`w-2 h-2 rounded-full ${dotColor}`} />
+                              {s}
+                            </button>
+                          );
+                        })}
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -230,16 +237,22 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
                           {priority || 'Trống'}
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-40 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
-                        {(['Low', 'Medium', 'High', 'Urgent'] as const).map(p => (
-                          <button 
-                            key={p} 
+                      <PopoverContent className="w-44 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-xl">
+                        {([
+                          { label: 'Low', color: 'text-green-400' },
+                          { label: 'Medium', color: 'text-yellow-400' },
+                          { label: 'High', color: 'text-orange-400' },
+                          { label: 'Very High', color: 'text-red-400' },
+                        ]).map(({ label, color }) => (
+                          <button
+                            key={label}
                             type="button"
-                            onClick={() => setPriority(p)}
+                            onClick={() => setPriority(label)}
                             className="w-full text-left p-2 hover:bg-gray-800 rounded text-xs transition-colors flex items-center gap-2"
                           >
-                            <Flag className={`w-3 h-3 ${p === 'Urgent' ? 'text-red-500' : (p === 'High' ? 'text-yellow-500' : 'text-blue-500')}`} />
-                            {p}
+                            <Flag className={`w-3 h-3 ${color}`} />
+                            {label}
+                            {priority === label && <CheckCircle2 className="w-3 h-3 ml-auto text-blue-400" />}
                           </button>
                         ))}
                       </PopoverContent>
@@ -251,14 +264,31 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
                     <span>Weight</span>
                   </div>
                   <div>
-                    <input 
-                      type="number"
-                      min="1"
-                      max="100"
+                    <input
+                      type="number" min="1" max="100"
                       value={weight}
                       onChange={(e) => setWeight(parseFloat(e.target.value) || 1)}
                       className="bg-transparent border-none outline-none w-full text-blue-400 font-bold text-sm focus:text-blue-300 transition-colors"
                       placeholder="1"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Tag className="w-4 h-4" />
+                    <span>Tiến độ ban đầu</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden mr-3">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+                      </div>
+                      <span className="text-xs text-blue-400 font-bold w-8 text-right">{progress}%</span>
+                    </div>
+                    <input
+                      type="range" min="0" max="100"
+                      value={progress}
+                      onChange={(e) => setProgress(parseInt(e.target.value))}
+                      className="w-full accent-blue-500 cursor-pointer"
                     />
                   </div>
 

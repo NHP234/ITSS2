@@ -5,5 +5,6 @@ const authMiddleware = require('../middleware/auth.middleware');
 const router = Router();
 
 router.get('/stats', authMiddleware, dashboardCtrl.getStats);
+router.get('/contributions', authMiddleware, dashboardCtrl.getContributions);
 
 module.exports = router;

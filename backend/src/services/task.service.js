@@ -2,7 +2,20 @@ const prisma = require('../prisma/client');
 const { recalculateCompletion } = require('./project.service');
 const notificationService = require('./notification.service');
 
-const VALID_STATUSES = ['Not Started', 'In Progress', 'Done'];
+const VALID_STATUSES = ['Not Started', 'In Progress', 'Reviewing', 'Done'];
+
+// ─── Parse dueDate from a Vietnamese date string like "19 tháng 11, 2025" ─────
+function parseDueDate(due) {
+  if (!due || typeof due !== 'string') return null;
+  const match = due.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/i);
+  if (match) {
+    const [_, day, month, year] = match;
+    const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    d.setHours(23, 59, 59, 999); // end of day
+    return d;
+  }
+  return null;
+}
 
 // ─── Lấy tất cả tasks mà user có quyền xem (tuỳ chọn filter theo projectId) ──
 async function getAllTasks(projectId, userId) {
@@ -37,8 +50,29 @@ async function getTaskById(id) {
   });
 }
 
+// ─── Lấy danh sách task quá hạn của user ─────────────────────────────────────
+async function getOverdueTasks(userId) {
+  const now = new Date();
+  return prisma.task.findMany({
+    where: {
+      project: {
+        members: { some: { id: userId } }
+      },
+      dueDate: { lt: now },
+      status: { notIn: ['Done'] }
+    },
+    orderBy: { dueDate: 'asc' },
+    include: {
+      assignees: { select: { id: true, name: true, email: true } },
+      project: { select: { id: true, name: true, icon: true } }
+    }
+  });
+}
+
 // ─── Tạo task mới ─────────────────────────────────────────────────────────────
 async function createTask(data) {
+  const dueDate = parseDueDate(data.due);
+
   const task = await prisma.task.create({
     data: {
       title: data.title.trim(),
@@ -46,10 +80,12 @@ async function createTask(data) {
       projectId: data.projectId,
       assignee: data.assignee ?? '',
       due: data.due ?? '',
+      dueDate: dueDate,
       priority: data.priority ?? '',
       summary: data.summary ?? '',
       icon: data.icon ?? 'calendar',
       weight: data.weight !== undefined ? parseFloat(data.weight) : 1,
+      progress: data.progress !== undefined ? parseInt(data.progress) : 0,
       assignees: data.assigneeIds ? {
         connect: data.assigneeIds.map(id => ({ id }))
       } : undefined,
@@ -82,11 +118,15 @@ async function updateTask(id, data) {
   if (data.title !== undefined)    updateData.title = data.title.trim();
   if (data.status !== undefined)   updateData.status = data.status;
   if (data.assignee !== undefined) updateData.assignee = data.assignee;
-  if (data.due !== undefined)      updateData.due = data.due;
   if (data.priority !== undefined) updateData.priority = data.priority;
   if (data.summary !== undefined)  updateData.summary = data.summary;
   if (data.icon !== undefined)     updateData.icon = data.icon;
   if (data.weight !== undefined)   updateData.weight = parseFloat(data.weight);
+  if (data.progress !== undefined) updateData.progress = parseInt(data.progress);
+  if (data.due !== undefined) {
+    updateData.due = data.due;
+    updateData.dueDate = parseDueDate(data.due);
+  }
   if (data.assigneeIds !== undefined) {
     updateData.assignees = {
       set: data.assigneeIds.map(id => ({ id }))
@@ -149,6 +189,21 @@ async function updateTaskStatus(id, status) {
   return task;
 }
 
+// ─── Cập nhật nhanh progress ─────────────────────────────────────────────────
+async function updateTaskProgress(id, progress) {
+  const val = parseInt(progress);
+  if (isNaN(val) || val < 0 || val > 100) {
+    const err = new Error('Progress phải là số nguyên từ 0 đến 100');
+    err.statusCode = 400;
+    throw err;
+  }
+  return prisma.task.update({
+    where: { id },
+    data: { progress: val },
+    include: { assignees: { select: { id: true, name: true, email: true } } },
+  });
+}
+
 // ─── Xoá task ─────────────────────────────────────────────────────────────────
 async function deleteTask(id) {
   const task = await prisma.task.delete({ where: { id } });
@@ -160,8 +215,10 @@ module.exports = {
   getAllTasks,
   getTasksByProject,
   getTaskById,
+  getOverdueTasks,
   createTask,
   updateTask,
   updateTaskStatus,
+  updateTaskProgress,
   deleteTask,
 };

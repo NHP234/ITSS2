@@ -78,6 +78,67 @@ async function getDashboardStats(userId) {
   };
 }
 
+/**
+ * Lấy thống kê đóng góp của từng thành viên trong các project của user
+ */
+async function getMemberContributions(userId) {
+  // Lấy tất cả project mà user là thành viên
+  const projects = await prisma.project.findMany({
+    where: {
+      members: { some: { id: userId } }
+    },
+    include: {
+      members: { select: { id: true, name: true, email: true } },
+      tasks: {
+        include: {
+          assignees: { select: { id: true, name: true, email: true } }
+        }
+      }
+    }
+  });
+
+  const now = new Date();
+
+  // Build per-project member contribution map
+  const result = projects.map(project => {
+    const memberStats = project.members.map(member => {
+      const assignedTasks = project.tasks.filter(t =>
+        t.assignees.some(a => a.id === member.id)
+      );
+      const doneTasks = assignedTasks.filter(t => t.status === 'Done');
+      const overdueTasks = assignedTasks.filter(t => {
+        if (t.status === 'Done') return false;
+        // Check dueDate field first, fallback to due string
+        if (t.dueDate) return new Date(t.dueDate) < now;
+        return false;
+      });
+      const inProgressTasks = assignedTasks.filter(t => t.status === 'In Progress' || t.status === 'Reviewing');
+      const completionRate = assignedTasks.length > 0
+        ? Math.round((doneTasks.length / assignedTasks.length) * 100)
+        : 0;
+
+      return {
+        member,
+        totalAssigned: assignedTasks.length,
+        done: doneTasks.length,
+        overdue: overdueTasks.length,
+        inProgress: inProgressTasks.length,
+        completionRate,
+      };
+    });
+
+    return {
+      projectId: project.id,
+      projectName: project.name,
+      projectIcon: project.icon,
+      members: memberStats,
+    };
+  });
+
+  return result;
+}
+
 module.exports = {
-  getDashboardStats
+  getDashboardStats,
+  getMemberContributions,
 };

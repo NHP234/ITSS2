@@ -1,7 +1,8 @@
 import { useEffect, useState, memo } from 'react';
-import { Target, CheckCircle2, Clock, Zap, TrendingUp, ChevronRight, AlertCircle, Calendar } from 'lucide-react';
+import { Target, CheckCircle2, Clock, Zap, TrendingUp, ChevronRight, AlertCircle, Calendar, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDashboardStats, DashboardStats } from '../api/dashboard';
+import { getOverdueTasks, type Task } from '../api';
 
 interface HomeProps {
   onSelectProject: (id: string) => void;
@@ -11,6 +12,8 @@ interface HomeProps {
 export const Home = memo(function Home({ onSelectProject, onTabChange }: HomeProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
+  const [loadingOverdue, setLoadingOverdue] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -23,8 +26,18 @@ export const Home = memo(function Home({ onSelectProject, onTabChange }: HomePro
         setLoading(false);
       }
     };
-
+    const fetchOverdue = async () => {
+      try {
+        const tasks = await getOverdueTasks();
+        setOverdueTasks(tasks);
+      } catch {
+        // không quan trọng nếu lỗi
+      } finally {
+        setLoadingOverdue(false);
+      }
+    };
     fetchStats();
+    fetchOverdue();
   }, []);
 
   const containerVariants = {
@@ -164,6 +177,58 @@ export const Home = memo(function Home({ onSelectProject, onTabChange }: HomePro
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Overdue Tasks Section */}
+        <AnimatePresence>
+          {!loadingOverdue && overdueTasks.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+                <h2 className="text-2xl font-bold">Nhiệm vụ quá hạn</h2>
+                <span className="px-3 py-1 bg-red-400/10 text-red-400 text-xs font-bold rounded-full border border-red-400/20">
+                  {overdueTasks.length} nhiệm vụ
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {overdueTasks.slice(0, 6).map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => onSelectProject(task.projectId)}
+                    className="flex items-center justify-between p-4 bg-[#1e1e1e] rounded-2xl border border-red-400/10 hover:border-red-400/30 hover:bg-[#252525] transition-all group text-left w-full cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-red-400/10 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-5 h-5 text-red-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-white group-hover:text-red-300 transition-colors truncate text-sm">
+                          {task.title}
+                        </h4>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {task.project && <span className="text-gray-400">{task.project.icon} {task.project.name}</span>}
+                          {task.due && (
+                            <>
+                              <span>·</span>
+                              <div className="flex items-center gap-1 text-red-400">
+                                <Calendar className="w-3 h-3" />
+                                <span>{task.due}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-red-400 group-hover:translate-x-1 transition-all shrink-0" />
                   </button>
                 ))}
               </div>

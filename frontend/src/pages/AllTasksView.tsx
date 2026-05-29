@@ -1,7 +1,7 @@
 import { useState, memo, useMemo } from 'react';
 import { 
   CheckSquare, Target, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, 
-  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2
+  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, TrendingUp
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -28,6 +28,19 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
     setExpandedProjects(prev => ({ ...prev, [projectId]: !prev[projectId] }));
   };
 
+  const isOverdue = (task: Task): boolean => {
+    if (task.status === 'Done') return false;
+    if ((task as any).dueDate) return new Date((task as any).dueDate) < new Date();
+    if (task.due) {
+      const match = task.due.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/i);
+      if (match) {
+        const [_, d, m, y] = match;
+        return new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 23, 59, 59) < new Date();
+      }
+    }
+    return false;
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Done':
@@ -44,6 +57,13 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
             <span className="text-xs text-blue-100 font-medium">In Progress</span>
           </div>
         );
+      case 'Reviewing':
+        return (
+          <div className="inline-flex items-center gap-1.5 bg-amber-900/40 border border-amber-800 px-2 py-0.5 rounded-full">
+            <div className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-xs text-amber-100 font-medium">Reviewing</span>
+          </div>
+        );
       default:
         return (
           <div className="inline-flex items-center gap-1.5 bg-[#444] border border-[#555] px-2 py-0.5 rounded-full">
@@ -56,6 +76,9 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
 
   const getPriorityBadge = (priority?: string) => {
     if (!priority) return null;
+    if (priority === 'Very High') {
+      return <Badge className="bg-purple-900/80 text-purple-100 hover:bg-purple-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Very High</Badge>;
+    }
     if (priority === 'High') {
       return <Badge className="bg-red-900/80 text-red-100 hover:bg-red-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">High</Badge>;
     }
@@ -110,6 +133,11 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
                     <Target className="w-3.5 h-3.5" /> Priority
                   </div>
                 </th>
+                <th className="font-medium py-2 px-4 w-24">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-3.5 h-3.5" /> Progress
+                  </div>
+                </th>
                 <th className="font-medium py-2 px-4">
                   <div className="flex items-center gap-2">
                     <AlignLeft className="w-3.5 h-3.5" /> Summary <Sparkles className="w-3 h-3 opacity-50" />
@@ -119,75 +147,92 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
               </tr>
             </thead>
             <tbody>
-              {projectTasks.map((task) => (
-                <tr key={task.id} className="border-b border-gray-800/50 hover:bg-[#222] group">
-                  <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-1">
-                        {getTaskIcon(task.icon)}
-                        <input
-                          value={task.title}
-                          onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
-                          className="bg-transparent border-none outline-none text-white w-full font-medium"
-                        />
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-500 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteTask?.(task.id);
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50">
-                    {getStatusBadge(task.status)}
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                    {task.assignee ? (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
-                          {task.assignee.charAt(0)}
+              {projectTasks.map((task) => {
+                const overdue = isOverdue(task);
+                return (
+                  <tr key={task.id} className={`border-b border-gray-800/50 group ${overdue ? 'bg-red-950/10 hover:bg-red-950/20' : 'hover:bg-[#222]'}`}>
+                    <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          {overdue && <span title="Quá hạn" className="text-red-400">⚠️</span>}
+                          {getTaskIcon(task.icon)}
+                          <input
+                            value={task.title}
+                            onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
+                            className="bg-transparent border-none outline-none text-white w-full font-medium"
+                          />
                         </div>
-                        {task.assignee}
+                        <Button
+                          variant="ghost" size="sm"
+                          className="text-gray-500 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => { e.stopPropagation(); onDeleteTask?.(task.id); }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
-                    ) : null}
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                    <CustomDatePicker 
-                      trigger={
-                        <button type="button" className="text-gray-300 hover:text-white hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors w-full text-left">
-                          {task.due || 'Trống'}
-                        </button>
-                      }
-                      onSelect={(date) => {
-                        if (date) {
-                          const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
-                          onUpdateTask(task.id, { due: formattedDate });
-                        } else {
-                          onUpdateTask(task.id, { due: '' });
+                    </td>
+                    <td className="py-2 px-4 border-r border-gray-800/50">
+                      {getStatusBadge(task.status)}
+                    </td>
+                    <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                      {task.assignees && task.assignees.length > 0 ? (
+                        <div className="flex -space-x-1">
+                          {task.assignees.map(a => (
+                            <div key={a.id} title={a.name} className="w-6 h-6 rounded-full bg-blue-600 border border-[#191919] flex items-center justify-center text-[9px] font-bold">
+                              {a.name.charAt(0).toUpperCase()}
+                            </div>
+                          ))}
+                        </div>
+                      ) : task.assignee ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">{task.assignee.charAt(0)}</div>
+                          {task.assignee}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className={`py-2 px-4 border-r border-gray-800/50 ${overdue ? 'text-red-400' : 'text-gray-300'}`}>
+                      <CustomDatePicker
+                        trigger={
+                          <button type="button" className="hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors w-full text-left">
+                            {task.due || 'Trống'}
+                          </button>
                         }
-                      }}
-                    />
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50">
-                    {getPriorityBadge(task.priority)}
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                    <input
-                      value={task.summary || ''}
-                      onChange={(e) => onUpdateTask(task.id, { summary: e.target.value })}
-                      className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600"
-                      placeholder="Thêm tóm tắt..."
-                    />
-                  </td>
-                  <td className="py-2 px-4"></td>
-                </tr>
-              ))}
+                        onSelect={(date) => {
+                          if (date) {
+                            const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+                            onUpdateTask(task.id, { due: formattedDate });
+                          } else {
+                            onUpdateTask(task.id, { due: '' });
+                          }
+                        }}
+                      />
+                    </td>
+                    <td className="py-2 px-4 border-r border-gray-800/50">
+                      {getPriorityBadge(task.priority)}
+                    </td>
+                    <td className="py-2 px-4 border-r border-gray-800/50">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${ (task.progress ?? 0) >= 100 ? 'bg-green-500' : (task.progress ?? 0) >= 50 ? 'bg-blue-500' : 'bg-orange-500'}`}
+                            style={{ width: `${task.progress ?? 0}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400 w-7">{task.progress ?? 0}%</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
+                      <input
+                        value={task.summary || ''}
+                        onChange={(e) => onUpdateTask(task.id, { summary: e.target.value })}
+                        className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600"
+                        placeholder="Thêm tóm tắt..."
+                      />
+                    </td>
+                    <td className="py-2 px-4"></td>
+                  </tr>
+                );
+              })}
               <tr>
                 <td colSpan={7} className="py-2 pl-8 text-gray-500 hover:bg-[#222] cursor-pointer" onClick={() => onCreateTask(projectId, 'Not Started')}>
                   <div className="flex items-center gap-2 text-sm">
@@ -245,7 +290,7 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
   }, [tasks]);
 
   const renderBoardView = () => {
-    const statuses = ['Not Started', 'In Progress', 'Done'];
+    const statuses = ['Not Started', 'In Progress', 'Reviewing', 'Done'];
     
     return (
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
@@ -255,11 +300,15 @@ export const AllTasksView = memo(function AllTasksView({ projects, tasks, onUpda
           let headerColor = 'bg-gray-800 text-gray-300';
           let bgColor = 'bg-[#1e1e1e] border-gray-800/60';
           let dotColor = 'bg-gray-400';
-          
+
           if (status === 'In Progress') {
             headerColor = 'bg-blue-900/50 text-blue-300';
             bgColor = 'bg-[#1a202c]/30 border-blue-900/30';
             dotColor = 'bg-blue-500';
+          } else if (status === 'Reviewing') {
+            headerColor = 'bg-amber-900/50 text-amber-300';
+            bgColor = 'bg-[#2c2400]/30 border-amber-900/30';
+            dotColor = 'bg-amber-400';
           } else if (status === 'Done') {
             headerColor = 'bg-green-900/50 text-green-300';
             bgColor = 'bg-[#1a2c1f]/30 border-green-900/30';
