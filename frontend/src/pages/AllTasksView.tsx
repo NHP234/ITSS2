@@ -1,11 +1,7 @@
 import { useState, memo, useMemo } from 'react';
 import { 
   CheckSquare, Target, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, 
-<<<<<<< HEAD
-  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, TrendingUp
-=======
-  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, Activity
->>>>>>> feature/recommendation
+  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, TrendingUp, Activity
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -124,22 +120,12 @@ export const AllTasksView = memo(function AllTasksView({
     }
   };
 
-<<<<<<< HEAD
-  const getPriorityBadge = (priority?: string) => {
-    if (!priority) return null;
-    if (priority === 'Very High') {
-      return <Badge className="bg-purple-900/80 text-purple-100 hover:bg-purple-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Very High</Badge>;
-    }
-    if (priority === 'High') {
-      return <Badge className="bg-red-900/80 text-red-100 hover:bg-red-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">High</Badge>;
-=======
   // Handle moving task between statuses
-  const handleMoveTask = (taskId: string, newStatus: "Not Started" | "In Progress" | "Done") => {
+  const handleMoveTask = (taskId: string, newStatus: "Not Started" | "In Progress" | "Reviewing" | "Done") => {
     if (onUpdateTaskStatus) {
       onUpdateTaskStatus(taskId, newStatus);
     } else {
       onUpdateTask(taskId, { status: newStatus });
->>>>>>> feature/recommendation
     }
   };
 
@@ -207,7 +193,6 @@ export const AllTasksView = memo(function AllTasksView({
               </tr>
             </thead>
             <tbody>
-<<<<<<< HEAD
               {projectTasks.map((task) => {
                 const overdue = isOverdue(task);
                 return (
@@ -222,79 +207,37 @@ export const AllTasksView = memo(function AllTasksView({
                             onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
                             className="bg-transparent border-none outline-none text-white w-full font-medium"
                           />
-=======
-              {projectTasks.map((task) => (
-                <tr key={task.id} className="border-b border-gray-800/50 hover:bg-[#222] group">
-                  <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-1">
-                        {getTaskIcon(task.icon)}
-                        <input
-                          value={task.title}
-                          onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
-                          className="bg-transparent border-none outline-none text-white w-full font-medium"
-                        />
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-500 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteTask?.(task.id);
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                          task.status === 'Not Started' ? 'bg-gray-700 text-gray-300' :
-                          task.status === 'In Progress' ? 'bg-blue-900/50 text-blue-200' :
-                          'bg-green-900/50 text-green-200'
-                        }`}>
-                          {getStatusLabel(task.status)}
-                          <ChevronDown className="w-3 h-3 inline ml-1" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-36 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-lg z-50">
-                        {['Not Started', 'In Progress', 'Done'].map(status => (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => handleMoveTask(task.id, status as "Not Started" | "In Progress" | "Done")}
-                            className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                              status === task.status ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-800'
-                            }`}
-                          >
-                            {getStatusLabel(status)}
-                          </button>
-                        ))}
-                      </PopoverContent>
-                    </Popover>
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                    {task.assignee ? (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
-                          {task.assignee.charAt(0)}
->>>>>>> feature/recommendation
                         </div>
-                        <Button
-                          variant="ghost" size="sm"
-                          className="text-gray-500 hover:text-red-400 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => { e.stopPropagation(); onDeleteTask?.(task.id); }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
                       </div>
-<<<<<<< HEAD
                     </td>
                     <td className="py-2 px-4 border-r border-gray-800/50">
-                      {getStatusBadge(task.status)}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                            task.status === 'Not Started' ? 'bg-gray-700 text-gray-300' :
+                            task.status === 'In Progress' ? 'bg-blue-900/50 text-blue-200' :
+                            task.status === 'Reviewing' ? 'bg-amber-900/50 text-amber-200' :
+                            'bg-green-900/50 text-green-200'
+                          }`}>
+                            {getStatusLabel(task.status)}
+                            <ChevronDown className="w-3 h-3 inline ml-1" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-36 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-lg z-50">
+                          {['Not Started', 'In Progress', 'Reviewing', 'Done'].map(status => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => handleMoveTask(task.id, status as any)}
+                              className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                                status === task.status ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-800'
+                              }`}
+                            >
+                              {getStatusLabel(status)}
+                            </button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
                     </td>
                     <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
                       {task.assignees && task.assignees.length > 0 ? (
@@ -351,52 +294,17 @@ export const AllTasksView = memo(function AllTasksView({
                         placeholder="Thêm tóm tắt..."
                       />
                     </td>
-                    <td className="py-2 px-4"></td>
+                    <td className="py-2 px-4">
+                      <button 
+                        onClick={() => onDeleteTask?.(task.id)}
+                        className="text-gray-500 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
-=======
-                    ) : null}
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                    <CustomDatePicker 
-                      trigger={
-                        <button type="button" className="text-gray-300 hover:text-white hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors w-full text-left">
-                          {task.due || 'Thêm ngày'}
-                        </button>
-                      }
-                      onSelect={(date) => {
-                        if (date) {
-                          const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
-                          onUpdateTask(task.id, { due: formattedDate });
-                        } else {
-                          onUpdateTask(task.id, { due: '' });
-                        }
-                      }}
-                    />
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50">
-                    {getPriorityBadge(task.priority)}
-                  </td>
-                  <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                    <input
-                      value={task.summary || ''}
-                      onChange={(e) => onUpdateTask(task.id, { summary: e.target.value })}
-                      className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600"
-                      placeholder="Thêm tóm tắt..."
-                    />
-                  </td>
-                  <td className="py-2 px-4">
-                    <button 
-                      onClick={() => onDeleteTask?.(task.id)}
-                      className="text-gray-500 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
->>>>>>> feature/recommendation
               <tr>
                 <td colSpan={7} className="py-2 pl-8 text-gray-500 hover:bg-[#222] cursor-pointer" onClick={() => onCreateTask(projectId, 'Not Started')}>
                   <div className="flex items-center gap-2 text-sm">
@@ -635,12 +543,8 @@ export const AllTasksView = memo(function AllTasksView({
   }, [filteredTasks]);
 
   const renderBoardView = () => {
-<<<<<<< HEAD
     const statuses = ['Not Started', 'In Progress', 'Reviewing', 'Done'];
-=======
-    const statuses = ['Not Started', 'In Progress', 'Done'];
-    const statusLabels = ['Chưa bắt đầu', 'Đang thực hiện', 'Hoàn thành'];
->>>>>>> feature/recommendation
+    const statusLabels = ['Chưa bắt đầu', 'Đang thực hiện', 'Reviewing', 'Hoàn thành'];
     
     return (
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
