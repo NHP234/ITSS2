@@ -1,11 +1,8 @@
 import { useState, memo, useMemo } from 'react';
 import { 
   CheckSquare, Target, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, 
-<<<<<<< HEAD
-  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, TrendingUp
-=======
-  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, Activity
->>>>>>> feature/recommendation
+  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, Activity,
+  TrendingUp
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -124,22 +121,12 @@ export const AllTasksView = memo(function AllTasksView({
     }
   };
 
-<<<<<<< HEAD
-  const getPriorityBadge = (priority?: string) => {
-    if (!priority) return null;
-    if (priority === 'Very High') {
-      return <Badge className="bg-purple-900/80 text-purple-100 hover:bg-purple-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">Very High</Badge>;
-    }
-    if (priority === 'High') {
-      return <Badge className="bg-red-900/80 text-red-100 hover:bg-red-900/80 rounded uppercase text-[10px] px-1.5 py-0 border-none">High</Badge>;
-=======
   // Handle moving task between statuses
   const handleMoveTask = (taskId: string, newStatus: "Not Started" | "In Progress" | "Done") => {
     if (onUpdateTaskStatus) {
       onUpdateTaskStatus(taskId, newStatus);
     } else {
       onUpdateTask(taskId, { status: newStatus });
->>>>>>> feature/recommendation
     }
   };
 
@@ -207,22 +194,6 @@ export const AllTasksView = memo(function AllTasksView({
               </tr>
             </thead>
             <tbody>
-<<<<<<< HEAD
-              {projectTasks.map((task) => {
-                const overdue = isOverdue(task);
-                return (
-                  <tr key={task.id} className={`border-b border-gray-800/50 group ${overdue ? 'bg-red-950/10 hover:bg-red-950/20' : 'hover:bg-[#222]'}`}>
-                    <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          {overdue && <span title="Quá hạn" className="text-red-400">⚠️</span>}
-                          {getTaskIcon(task.icon)}
-                          <input
-                            value={task.title}
-                            onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
-                            className="bg-transparent border-none outline-none text-white w-full font-medium"
-                          />
-=======
               {projectTasks.map((task) => (
                 <tr key={task.id} className="border-b border-gray-800/50 hover:bg-[#222] group">
                   <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
@@ -281,7 +252,6 @@ export const AllTasksView = memo(function AllTasksView({
                       <div className="flex items-center gap-1.5">
                         <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">
                           {task.assignee.charAt(0)}
->>>>>>> feature/recommendation
                         </div>
                         <Button
                           variant="ghost" size="sm"
@@ -291,71 +261,6 @@ export const AllTasksView = memo(function AllTasksView({
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-<<<<<<< HEAD
-                    </td>
-                    <td className="py-2 px-4 border-r border-gray-800/50">
-                      {getStatusBadge(task.status)}
-                    </td>
-                    <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                      {task.assignees && task.assignees.length > 0 ? (
-                        <div className="flex -space-x-1">
-                          {task.assignees.map(a => (
-                            <div key={a.id} title={a.name} className="w-6 h-6 rounded-full bg-blue-600 border border-[#191919] flex items-center justify-center text-[9px] font-bold">
-                              {a.name.charAt(0).toUpperCase()}
-                            </div>
-                          ))}
-                        </div>
-                      ) : task.assignee ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">{task.assignee.charAt(0)}</div>
-                          {task.assignee}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className={`py-2 px-4 border-r border-gray-800/50 ${overdue ? 'text-red-400' : 'text-gray-300'}`}>
-                      <CustomDatePicker
-                        trigger={
-                          <button type="button" className="hover:bg-gray-800 px-2 py-1 rounded -ml-2 transition-colors w-full text-left">
-                            {task.due || 'Trống'}
-                          </button>
-                        }
-                        onSelect={(date) => {
-                          if (date) {
-                            const formattedDate = `${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
-                            onUpdateTask(task.id, { due: formattedDate });
-                          } else {
-                            onUpdateTask(task.id, { due: '' });
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="py-2 px-4 border-r border-gray-800/50">
-                      {getPriorityBadge(task.priority)}
-                    </td>
-                    <td className="py-2 px-4 border-r border-gray-800/50">
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${ (task.progress ?? 0) >= 100 ? 'bg-green-500' : (task.progress ?? 0) >= 50 ? 'bg-blue-500' : 'bg-orange-500'}`}
-                            style={{ width: `${task.progress ?? 0}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-gray-400 w-7">{task.progress ?? 0}%</span>
-                      </div>
-                    </td>
-                    <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
-                      <input
-                        value={task.summary || ''}
-                        onChange={(e) => onUpdateTask(task.id, { summary: e.target.value })}
-                        className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600"
-                        placeholder="Thêm tóm tắt..."
-                      />
-                    </td>
-                    <td className="py-2 px-4"></td>
-                  </tr>
-                );
-              })}
-=======
                     ) : null}
                   </td>
                   <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
@@ -396,7 +301,6 @@ export const AllTasksView = memo(function AllTasksView({
                   </td>
                 </tr>
               ))}
->>>>>>> feature/recommendation
               <tr>
                 <td colSpan={7} className="py-2 pl-8 text-gray-500 hover:bg-[#222] cursor-pointer" onClick={() => onCreateTask(projectId, 'Not Started')}>
                   <div className="flex items-center gap-2 text-sm">
@@ -635,12 +539,8 @@ export const AllTasksView = memo(function AllTasksView({
   }, [filteredTasks]);
 
   const renderBoardView = () => {
-<<<<<<< HEAD
-    const statuses = ['Not Started', 'In Progress', 'Reviewing', 'Done'];
-=======
     const statuses = ['Not Started', 'In Progress', 'Done'];
     const statusLabels = ['Chưa bắt đầu', 'Đang thực hiện', 'Hoàn thành'];
->>>>>>> feature/recommendation
     
     return (
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
