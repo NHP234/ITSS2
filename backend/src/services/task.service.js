@@ -51,6 +51,20 @@ function getDifficultyFromWeight(weight) {
   return 'Very Hard';
 }
 
+function parseDueDate(dueStr) {
+  if (!dueStr) return null;
+  // Format: "D tháng M, Y" (Vietnamese)
+  const dateMatch = dueStr.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/);
+  if (dateMatch) {
+    const day = parseInt(dateMatch[1], 10);
+    const month = parseInt(dateMatch[2], 10);
+    const year = parseInt(dateMatch[3], 10);
+    return new Date(year, month - 1, day, 23, 59, 59); // End of day
+  }
+  const parsed = new Date(dueStr);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 // ─── Lấy tất cả tasks mà user có quyền xem ───────────────────────────────────
 async function getAllTasks(projectId, userId) {
   return prisma.task.findMany({
@@ -128,6 +142,7 @@ async function createTask(data) {
       projectId: data.projectId,
       assignee: data.assignee ?? '',
       due: data.due ?? '',
+      dueDate: data.due ? parseDueDate(data.due) : null,
       priority: data.priority ?? 'Medium',
       summary: data.summary ?? '',
       icon: data.icon ?? 'calendar',
@@ -165,7 +180,10 @@ async function updateTask(id, data) {
   if (data.title !== undefined) updateData.title = data.title.trim();
   if (data.status !== undefined) updateData.status = data.status;
   if (data.assignee !== undefined) updateData.assignee = data.assignee;
-  if (data.due !== undefined) updateData.due = data.due;
+  if (data.due !== undefined) {
+    updateData.due = data.due;
+    updateData.dueDate = data.due ? parseDueDate(data.due) : null;
+  }
   if (data.priority !== undefined) {
     if (!VALID_PRIORITIES.includes(data.priority)) {
       throw new Error(`Priority không hợp lệ. Phải là: ${VALID_PRIORITIES.join(', ')}`);

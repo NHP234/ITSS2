@@ -232,6 +232,24 @@ async function removeLink(linkId) {
   });
 }
 
+// ─── Kiểm tra tư cách thành viên của dự án ─────────────────────────────────────
+async function checkProjectMembership(projectId, userId) {
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      members: {
+        some: { id: userId }
+      }
+    }
+  });
+  if (!project) {
+    const error = new Error('Bạn không có quyền truy cập dự án này');
+    error.statusCode = 403;
+    throw error;
+  }
+  return project;
+}
+
 module.exports = {
   getAllProjects,
   getProjectById,
@@ -244,4 +262,5 @@ module.exports = {
   addLink,
   removeLink,
   updateProjectStatusByDate, // Add this
+  checkProjectMembership,
 };

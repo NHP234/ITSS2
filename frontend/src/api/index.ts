@@ -36,6 +36,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  createdAt?: string;
 }
 
 export type TaskStatus = 'Not Started' | 'In Progress' | 'Reviewing' | 'Done';
