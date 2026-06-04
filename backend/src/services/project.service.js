@@ -59,9 +59,9 @@ async function createProject(data, creatorId) {
     memberIds.push(creatorId);
   }
 
-  // Parse dates to determine initial status
-  let initialStatus = 'Planning';
-  if (data.dates) {
+  // Parse dates to determine initial status if no status was provided
+  let initialStatus = data.status || 'Planning';
+  if (!data.status && data.dates) {
     const dateInfo = parseDateRange(data.dates);
     if (dateInfo && dateInfo.start <= new Date()) {
       initialStatus = 'In Progress';
@@ -179,9 +179,26 @@ async function recalculateCompletion(projectId) {
     ? 0 
     : Math.round((doneWeight / totalWeight) * 10000) / 100;
 
+  // Auto-status logic: transition to Finished when 100% done, revert to In Progress if tasks reopened
+  let newStatus = undefined;
+  if (completion === 100 && totalWeight > 0) {
+    newStatus = 'Finished';
+  } else {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { status: true }
+    });
+    if (project && project.status === 'Finished' && completion < 100) {
+      newStatus = 'In Progress';
+    }
+  }
+
   return prisma.project.update({
     where: { id: projectId },
-    data: { completion },
+    data: { 
+      completion,
+      status: newStatus
+    },
   });
 }
 
@@ -207,6 +224,23 @@ async function addMember(projectId, userId) {
 
 // ─── Xoá thành viên ───────────────────────────────────────────────────────────
 async function removeMember(projectId, userId) {
+  // Tìm tất cả các task thuộc dự án mà user này đang được gán
+  const tasksToDisconnect = await prisma.task.findMany({
+    where: { 
+      projectId, 
+      assignees: { some: { id: userId } } 
+    },
+    select: { id: true }
+  });
+
+  // Gỡ bỏ gán task cho user này
+  for (const t of tasksToDisconnect) {
+    await prisma.task.update({
+      where: { id: t.id },
+      data: { assignees: { disconnect: { id: userId } } }
+    });
+  }
+
   return prisma.project.update({
     where: { id: projectId },
     data: { members: { disconnect: { id: userId } } },

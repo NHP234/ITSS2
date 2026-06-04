@@ -39,6 +39,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [createProjectStatus, setCreateProjectStatus] = useState<string>('Planning');
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [currentProjectIdForTask, setCurrentProjectIdForTask] = useState<string | null>(null);
   const [currentTaskStatus, setCurrentTaskStatus] = useState<string>('Not Started');
@@ -91,7 +92,7 @@ export default function App() {
     try {
       await createProject({
         ...data,
-        status: 'Planning',
+        status: createProjectStatus,
         owner: user?.name || '',
         priority: '',
         completion: 0,
@@ -103,7 +104,7 @@ export default function App() {
     } catch (err) {
       console.error('Lỗi tạo dự án:', err);
     }
-  }, [user]);
+  }, [user, createProjectStatus]);
 
   const handleDeleteProject = useCallback(async (projectId: string) => {
     if (!confirm('Bạn có chắc chắn muốn xoá dự án này và tất cả nhiệm vụ liên quan?')) return;
@@ -296,7 +297,10 @@ export default function App() {
               <ProjectList
                 projects={projects}
                 onSelectProject={setSelectedProjectId}
-                onCreateProject={() => setIsCreateProjectOpen(true)}
+                onCreateProject={(status) => {
+                  setCreateProjectStatus(status || 'Planning');
+                  setIsCreateProjectOpen(true);
+                }}
                 onDeleteProject={handleDeleteProject}
                 selectedProjectId={selectedProjectId}
               />
