@@ -59,9 +59,9 @@ async function createProject(data, creatorId) {
     memberIds.push(creatorId);
   }
 
-  // Parse dates to determine initial status
-  let initialStatus = 'Planning';
-  if (data.dates) {
+  // Parse dates to determine initial status if no status was provided
+  let initialStatus = data.status || 'Planning';
+  if (!data.status && data.dates) {
     const dateInfo = parseDateRange(data.dates);
     if (dateInfo && dateInfo.start <= new Date()) {
       initialStatus = 'In Progress';
@@ -78,7 +78,7 @@ async function createProject(data, creatorId) {
       priority: data.priority ?? '',
       completion: data.completion ?? 0,
       blockedBy: data.blockedBy ?? '',
-      icon: data.icon ?? '🎯',
+      icon: data.icon ?? '🎯',  // ✅ This is correct
       members: {
         connect: memberIds.map(id => ({ id }))
       },
@@ -123,7 +123,7 @@ async function updateProject(id, data) {
 // Function to update project status based on current date (called periodically)
 async function updateProjectStatusByDate(projectId) {
   const project = await prisma.project.findUnique({
-    where: { id },
+    where: { id: projectId },
     select: { dates: true, status: true }
   });
   
@@ -179,9 +179,26 @@ async function recalculateCompletion(projectId) {
     ? 0 
     : Math.round((doneWeight / totalWeight) * 10000) / 100;
 
+  // Auto-status logic: transition to Finished when 100% done, revert to In Progress if tasks reopened
+  let newStatus = undefined;
+  if (completion === 100 && totalWeight > 0) {
+    newStatus = 'Finished';
+  } else {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { status: true }
+    });
+    if (project && project.status === 'Finished' && completion < 100) {
+      newStatus = 'In Progress';
+    }
+  }
+
   return prisma.project.update({
     where: { id: projectId },
-    data: { completion },
+    data: { 
+      completion,
+      status: newStatus
+    },
   });
 }
 
@@ -207,6 +224,23 @@ async function addMember(projectId, userId) {
 
 // ─── Xoá thành viên ───────────────────────────────────────────────────────────
 async function removeMember(projectId, userId) {
+  // Tìm tất cả các task thuộc dự án mà user này đang được gán
+  const tasksToDisconnect = await prisma.task.findMany({
+    where: { 
+      projectId, 
+      assignees: { some: { id: userId } } 
+    },
+    select: { id: true }
+  });
+
+  // Gỡ bỏ gán task cho user này
+  for (const t of tasksToDisconnect) {
+    await prisma.task.update({
+      where: { id: t.id },
+      data: { assignees: { disconnect: { id: userId } } }
+    });
+  }
+
   return prisma.project.update({
     where: { id: projectId },
     data: { members: { disconnect: { id: userId } } },
@@ -232,6 +266,46 @@ async function removeLink(linkId) {
   });
 }
 
+// ─── Kiểm tra tư cách thành viên của dự án ─────────────────────────────────────
+async function checkProjectMembership(projectId, userId) {
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      members: {
+        some: { id: userId }
+      }
+    }
+  });
+  if (!project) {
+    const error = new Error('Bạn không có quyền truy cập dự án này');
+    error.statusCode = 403;
+    throw error;
+  }
+  return project;
+}
+
+// ─── Kiểm tra quyền sở hữu dự án ──────────────────────────────────────────────
+async function checkProjectOwnership(projectId, userId) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId }
+  });
+  if (!project) {
+    const error = new Error('Không tìm thấy dự án');
+    error.statusCode = 404;
+    throw error;
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true }
+  });
+  if (!user || user.name !== project.owner) {
+    const error = new Error('Chỉ chủ dự án mới có quyền thực hiện thao tác này');
+    error.statusCode = 403;
+    throw error;
+  }
+  return project;
+}
+
 module.exports = {
   getAllProjects,
   getProjectById,
@@ -244,4 +318,6 @@ module.exports = {
   addLink,
   removeLink,
   updateProjectStatusByDate, // Add this
+  checkProjectMembership,
+  checkProjectOwnership,
 };

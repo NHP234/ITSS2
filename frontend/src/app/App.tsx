@@ -9,6 +9,8 @@ const TaskView = lazy(() => import('../pages/TaskView').then(m => ({ default: m.
 const Home = lazy(() => import('../pages/Home').then(m => ({ default: m.Home })));
 const AllTasksView = lazy(() => import('../pages/AllTasksView').then(m => ({ default: m.AllTasksView })));
 const NotificationView = lazy(() => import('../pages/NotificationView').then(m => ({ default: m.NotificationView })));
+const AccountView = lazy(() => import('../pages/AccountView').then(m => ({ default: m.AccountView })));
+const SettingsView = lazy(() => import('../pages/SettingsView').then(m => ({ default: m.SettingsView })));
 const Login = lazy(() => import('../pages/Login').then(m => ({ default: m.Login })));
 import {
   type Project,
@@ -37,6 +39,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [createProjectStatus, setCreateProjectStatus] = useState<string>('Planning');
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [currentProjectIdForTask, setCurrentProjectIdForTask] = useState<string | null>(null);
   const [currentTaskStatus, setCurrentTaskStatus] = useState<string>('Not Started');
@@ -89,19 +92,19 @@ export default function App() {
     try {
       await createProject({
         ...data,
-        status: 'Planning',
+        status: createProjectStatus,
         owner: user?.name || '',
         priority: '',
         completion: 0,
         blockedBy: '',
-        icon: '🎯',
+        icon: data.icon || '🎯',
       });
       const projectsData = await getProjects();
       setProjects(projectsData);
     } catch (err) {
       console.error('Lỗi tạo dự án:', err);
     }
-  }, [user]);
+  }, [user, createProjectStatus]);
 
   const handleDeleteProject = useCallback(async (projectId: string) => {
     if (!confirm('Bạn có chắc chắn muốn xoá dự án này và tất cả nhiệm vụ liên quan?')) return;
@@ -266,6 +269,7 @@ export default function App() {
         }>
           {activeTab === 'home' && (
             <Home 
+              user={user}
               onSelectProject={(id) => {
                 setSelectedProjectId(id);
                 setActiveTab('projects');
@@ -293,7 +297,10 @@ export default function App() {
               <ProjectList
                 projects={projects}
                 onSelectProject={setSelectedProjectId}
-                onCreateProject={() => setIsCreateProjectOpen(true)}
+                onCreateProject={(status) => {
+                  setCreateProjectStatus(status || 'Planning');
+                  setIsCreateProjectOpen(true);
+                }}
                 onDeleteProject={handleDeleteProject}
                 selectedProjectId={selectedProjectId}
               />
@@ -317,16 +324,15 @@ export default function App() {
           {activeTab === 'notifications' && (
             <NotificationView />
           )}
-        </Suspense>
 
-        {(activeTab === 'account' || activeTab === 'settings') && (
-          <div className="flex-1 flex items-center justify-center bg-[#191919] text-gray-500">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-300 mb-2">Tính năng đang phát triển</h2>
-              <p>Mục này sẽ sớm ra mắt trong tương lai.</p>
-            </div>
-          </div>
-        )}
+          {activeTab === 'account' && (
+            <AccountView user={user} projects={projects} tasks={tasks} />
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsView />
+          )}
+        </Suspense>
 
         <CreateProjectDialog
           open={isCreateProjectOpen}

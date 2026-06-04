@@ -1,5 +1,6 @@
 const app    = require('./app');
 const prisma = require('./prisma/client');
+const { startDeadlineChecks } = require('./services/deadlineCheck.service');
 
 const PORT = process.env.PORT || 3001;
 
@@ -8,6 +9,9 @@ async function main() {
   try {
     await prisma.$connect();
     console.log('✅ Đã kết nối PostgreSQL');
+    
+    // Khởi động trình kiểm tra hạn chót nhiệm vụ
+    startDeadlineChecks();
   } catch {
     console.warn('⚠️  Chưa kết nối được DB (chưa chạy Docker?)');
     console.warn('   → Chạy: docker-compose up -d');

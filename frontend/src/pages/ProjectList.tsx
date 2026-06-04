@@ -12,7 +12,7 @@ import { type Project } from '../api';
 interface ProjectListProps {
   projects: Project[];
   onSelectProject: (projectId: string) => void;
-  onCreateProject: () => void;
+  onCreateProject: (status?: string) => void;
   onDeleteProject?: (projectId: string) => void;
   selectedProjectId: string | null;
 }
@@ -334,7 +334,7 @@ export const ProjectList = memo(function ProjectList({ projects, onSelectProject
                 <Button 
                   variant="ghost" 
                   className="w-full text-gray-500 hover:text-gray-300 hover:bg-[#2a2a2a] justify-start text-sm font-medium py-2 h-auto"
-                  onClick={onCreateProject}
+                  onClick={() => onCreateProject(status)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Dự án mới

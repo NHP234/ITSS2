@@ -46,7 +46,20 @@ async function createManyNotifications(dataArray) {
 /**
  * Đánh dấu đã đọc
  */
-async function markAsRead(id) {
+async function markAsRead(id, userId) {
+  const notification = await prisma.notification.findUnique({
+    where: { id }
+  });
+  if (!notification) {
+    const error = new Error('Không tìm thấy thông báo');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (notification.userId !== userId) {
+    const error = new Error('Bạn không có quyền thao tác trên thông báo này');
+    error.statusCode = 403;
+    throw error;
+  }
   return prisma.notification.update({
     where: { id },
     data: { read: true }

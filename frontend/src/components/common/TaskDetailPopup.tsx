@@ -64,16 +64,30 @@ export function TaskDetailPopup({
     }
   };
 
+  const normalizeScore = (score: number): number => {
+    if (score > 10) return Math.min(score / 10, 10);
+    return score;
+  };
+
   const getAvailabilityColor = (score: number) => {
-    if (score >= 2.5) return 'text-green-400';
-    if (score >= 1.5) return 'text-yellow-400';
+    const normalized = normalizeScore(score);
+    if (normalized >= 7) return 'text-green-400';
+    if (normalized >= 4) return 'text-yellow-400';
     return 'text-orange-400';
   };
 
   const getAvailabilityBg = (score: number) => {
-    if (score >= 2.5) return 'bg-green-500/10 border-green-500/30';
-    if (score >= 1.5) return 'bg-yellow-500/10 border-yellow-500/30';
+    const normalized = normalizeScore(score);
+    if (normalized >= 7) return 'bg-green-500/10 border-green-500/30';
+    if (normalized >= 4) return 'bg-yellow-500/10 border-yellow-500/30';
     return 'bg-orange-500/10 border-orange-500/30';
+  };
+
+  const getAvailabilityLabel = (score: number) => {
+    const normalized = normalizeScore(score);
+    if (normalized >= 7) return 'Rất sẵn sàng';
+    if (normalized >= 4) return 'Có thể hỗ trợ';
+    return 'Hơi bận';
   };
 
   // Determine if task is overdue and if we should show recommendations
@@ -143,8 +157,8 @@ export function TaskDetailPopup({
                           </div>
                         </div>
                         <div className={`text-right flex-shrink-0 ${getAvailabilityColor(person.availabilityScore)}`}>
-                          <p className="font-bold text-xs">{person.availabilityScore.toFixed(1)}</p>
-                          <p className="text-[9px] opacity-70">Sẵn sàng</p>
+                          <p className="font-bold text-xs">{normalizeScore(person.availabilityScore).toFixed(1)}/10</p>
+                          <p className="text-[9px] opacity-70 font-medium">{getAvailabilityLabel(person.availabilityScore)}</p>
                         </div>
                       </div>
                     </div>

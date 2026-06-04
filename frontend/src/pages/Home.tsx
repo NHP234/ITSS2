@@ -2,14 +2,15 @@ import { useEffect, useState, memo } from 'react';
 import { Target, CheckCircle2, Clock, Zap, TrendingUp, ChevronRight, AlertCircle, Calendar, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDashboardStats, DashboardStats } from '../api/dashboard';
-import { getOverdueTasks, type Task } from '../api';
+import { getOverdueTasks, type Task, type User } from '../api';
 
 interface HomeProps {
+  user: User | null;
   onSelectProject: (id: string) => void;
   onTabChange: (tab: string) => void;
 }
 
-export const Home = memo(function Home({ onSelectProject, onTabChange }: HomeProps) {
+export const Home = memo(function Home({ user, onSelectProject, onTabChange }: HomeProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
@@ -79,7 +80,7 @@ export const Home = memo(function Home({ onSelectProject, onTabChange }: HomePro
             <span className="text-sm font-bold tracking-widest uppercase">Dashboard Overview</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-tight">
-            Chào mừng trở lại, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">Bình</span>!
+            Chào mừng trở lại, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">{user?.name || 'Bạn'}</span>!
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl leading-relaxed">
             Hệ thống quản lý dự án thông minh giúp bạn theo dõi tiến độ và tối ưu hóa hiệu suất làm việc của nhóm.

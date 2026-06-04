@@ -108,8 +108,18 @@ async function getMemberContributions(userId) {
       const doneTasks = assignedTasks.filter(t => t.status === 'Done');
       const overdueTasks = assignedTasks.filter(t => {
         if (t.status === 'Done') return false;
-        // Check dueDate field first, fallback to due string
         if (t.dueDate) return new Date(t.dueDate) < now;
+        if (t.due) {
+          const dateMatch = t.due.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/);
+          if (dateMatch) {
+            const day = parseInt(dateMatch[1], 10);
+            const month = parseInt(dateMatch[2], 10);
+            const year = parseInt(dateMatch[3], 10);
+            return new Date(year, month - 1, day, 23, 59, 59) < now;
+          }
+          const parsed = new Date(t.due);
+          if (!isNaN(parsed.getTime())) return parsed < now;
+        }
         return false;
       });
       const inProgressTasks = assignedTasks.filter(t => t.status === 'In Progress' || t.status === 'Reviewing');
