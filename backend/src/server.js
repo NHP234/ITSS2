@@ -6,8 +6,17 @@ const { startDeadlineChecks } = require('./services/deadlineCheck.service');
 const PORT = process.env.PORT || 3001;
 
 async function autoSeed() {
-  const count = await prisma.user.count();
-  if (count > 0) return;
+  const existing = await prisma.user.findUnique({ where: { email: 'binh@example.com' } });
+  if (existing) return;
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    console.log('⚠️ Có user nhưng thiếu binh@example.com — xoá để seed lại...');
+    await prisma.notification.deleteMany();
+    await prisma.projectLink.deleteMany();
+    await prisma.task.deleteMany();
+    await prisma.project.deleteMany();
+    await prisma.user.deleteMany();
+  }
   console.log('🌱 DB trống — tự động seed...');
   await seed(prisma);
 }
