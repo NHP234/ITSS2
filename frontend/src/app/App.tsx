@@ -10,6 +10,7 @@ const Home = lazy(() => import('../pages/Home').then(m => ({ default: m.Home }))
 const AllTasksView = lazy(() => import('../pages/AllTasksView').then(m => ({ default: m.AllTasksView })));
 const NotificationView = lazy(() => import('../pages/NotificationView').then(m => ({ default: m.NotificationView })));
 const AccountView = lazy(() => import('../pages/AccountView').then(m => ({ default: m.AccountView })));
+const SettingsView = lazy(() => import('../pages/SettingsView').then(m => ({ default: m.SettingsView })));
 const Login = lazy(() => import('../pages/Login').then(m => ({ default: m.Login })));
 import {
   type Project,
@@ -267,6 +268,7 @@ export default function App() {
         }>
           {activeTab === 'home' && (
             <Home 
+              user={user}
               onSelectProject={(id) => {
                 setSelectedProjectId(id);
                 setActiveTab('projects');
@@ -322,16 +324,11 @@ export default function App() {
           {activeTab === 'account' && (
             <AccountView user={user} projects={projects} tasks={tasks} />
           )}
-        </Suspense>
 
-        {activeTab === 'settings' && (
-          <div className="flex-1 flex items-center justify-center bg-[#191919] text-gray-500">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-300 mb-2">Tính năng đang phát triển</h2>
-              <p>Mục này sẽ sớm ra mắt trong tương lai.</p>
-            </div>
-          </div>
-        )}
+          {activeTab === 'settings' && (
+            <SettingsView />
+          )}
+        </Suspense>
 
         <CreateProjectDialog
           open={isCreateProjectOpen}

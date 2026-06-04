@@ -1,7 +1,11 @@
 // ─── Global error handler ────────────────────────────────────────────────────
 function errorHandler(err, _req, res, _next) {
   console.error('[GlobalError]', err.stack ?? err.message);
-  res.status(500).json({ error: 'Lỗi server không xác định', details: err.message });
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    error: err.statusCode ? err.message : 'Lỗi server không xác định',
+    details: err.message
+  });
 }
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ async function getMyNotifications(req, res, next) {
 async function markRead(req, res, next) {
   try {
     const { id } = req.params;
-    const updated = await notificationService.markAsRead(id);
+    const updated = await notificationService.markAsRead(id, req.userId);
     res.json(updated);
   } catch (err) {
     next(err);

@@ -123,7 +123,7 @@ async function updateProject(id, data) {
 // Function to update project status based on current date (called periodically)
 async function updateProjectStatusByDate(projectId) {
   const project = await prisma.project.findUnique({
-    where: { id },
+    where: { id: projectId },
     select: { dates: true, status: true }
   });
   
@@ -250,6 +250,28 @@ async function checkProjectMembership(projectId, userId) {
   return project;
 }
 
+// ─── Kiểm tra quyền sở hữu dự án ──────────────────────────────────────────────
+async function checkProjectOwnership(projectId, userId) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId }
+  });
+  if (!project) {
+    const error = new Error('Không tìm thấy dự án');
+    error.statusCode = 404;
+    throw error;
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true }
+  });
+  if (!user || user.name !== project.owner) {
+    const error = new Error('Chỉ chủ dự án mới có quyền thực hiện thao tác này');
+    error.statusCode = 403;
+    throw error;
+  }
+  return project;
+}
+
 module.exports = {
   getAllProjects,
   getProjectById,
@@ -263,4 +285,5 @@ module.exports = {
   removeLink,
   updateProjectStatusByDate, // Add this
   checkProjectMembership,
+  checkProjectOwnership,
 };
