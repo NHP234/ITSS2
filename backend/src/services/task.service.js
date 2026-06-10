@@ -31,7 +31,6 @@ function getDifficultyWeight(difficulty) {
 function calculateTotalWeight(priority, difficulty) {
   const priorityWeight = getPriorityWeight(priority);
   const difficultyWeight = getDifficultyWeight(difficulty);
-  // Average of priority and difficulty, range 2-10
   return Math.round((priorityWeight + difficultyWeight) / 2);
 }
 
@@ -59,7 +58,7 @@ function parseDueDate(dueStr) {
     const day = parseInt(dateMatch[1], 10);
     const month = parseInt(dateMatch[2], 10);
     const year = parseInt(dateMatch[3], 10);
-    return new Date(year, month - 1, day, 23, 59, 59); // End of day
+    return new Date(year, month - 1, day, 23, 59, 59);
   }
   const parsed = new Date(dueStr);
   return isNaN(parsed.getTime()) ? null : parsed;
@@ -135,22 +134,37 @@ async function createTask(data) {
     throw new Error(`Priority không hợp lệ. Phải là: ${VALID_PRIORITIES.join(', ')}`);
   }
 
+  // Prepare create data
+  const createData = {
+    title: data.title.trim(),
+    status: data.status ?? 'Not Started',
+    projectId: data.projectId,
+    assignee: data.assignee ?? '',
+    due: data.due ?? '',
+    priority: data.priority ?? 'Medium',
+    summary: data.summary ?? '',
+    icon: data.icon ?? 'calendar',
+    weight: weight,
+    progress: data.progress ?? 0,
+  };
+
+  // Add dueDate if due is provided and can be parsed
+  if (data.due) {
+    const parsedDueDate = parseDueDate(data.due);
+    if (parsedDueDate) {
+      createData.dueDate = parsedDueDate;
+    }
+  }
+
+  // Add assignees connection if provided
+  if (data.assigneeIds && data.assigneeIds.length > 0) {
+    createData.assignees = {
+      connect: data.assigneeIds.map(id => ({ id }))
+    };
+  }
+
   const task = await prisma.task.create({
-    data: {
-      title: data.title.trim(),
-      status: data.status ?? 'Not Started',
-      projectId: data.projectId,
-      assignee: data.assignee ?? '',
-      due: data.due ?? '',
-      dueDate: data.due ? parseDueDate(data.due) : null,
-      priority: data.priority ?? 'Medium',
-      summary: data.summary ?? '',
-      icon: data.icon ?? 'calendar',
-      weight: weight,
-      assignees: data.assigneeIds ? {
-        connect: data.assigneeIds.map(id => ({ id }))
-      } : undefined,
-    },
+    data: createData,
     include: { assignees: { select: { id: true, name: true, email: true } } },
   });
 
@@ -173,6 +187,21 @@ async function createTask(data) {
   return task;
 }
 
+async function getMemberDetails(projectId, userId) {
+  try {
+    const storageKey = `memberDetails_${projectId}`;
+    const data = localStorage.getItem(storageKey);
+    if (data) {
+      const details = JSON.parse(data);
+      return details[userId] || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to load member details:', error);
+    return null;
+  }
+}
+
 // ─── Cập nhật task ────────────────────────────────────────────────────────────
 async function updateTask(id, data) {
   const updateData = {};
@@ -182,7 +211,16 @@ async function updateTask(id, data) {
   if (data.assignee !== undefined) updateData.assignee = data.assignee;
   if (data.due !== undefined) {
     updateData.due = data.due;
-    updateData.dueDate = data.due ? parseDueDate(data.due) : null;
+    if (data.due) {
+      const parsedDueDate = parseDueDate(data.due);
+      if (parsedDueDate) {
+        updateData.dueDate = parsedDueDate;
+      } else {
+        updateData.dueDate = null;
+      }
+    } else {
+      updateData.dueDate = null;
+    }
   }
   if (data.priority !== undefined) {
     if (!VALID_PRIORITIES.includes(data.priority)) {
@@ -192,22 +230,28 @@ async function updateTask(id, data) {
   }
   if (data.summary !== undefined) updateData.summary = data.summary;
   if (data.icon !== undefined) updateData.icon = data.icon;
+  if (data.progress !== undefined) updateData.progress = data.progress;
   
   // Handle weight calculation
   if (data.weight !== undefined) {
     updateData.weight = parseFloat(data.weight);
   } else if (data.priority !== undefined || data.difficulty !== undefined) {
-    // Recalculate weight based on priority and difficulty
     const currentTask = await prisma.task.findUnique({ where: { id } });
     const priority = data.priority || currentTask?.priority || 'Medium';
-    const difficulty = data.difficulty || 'Medium'; // difficulty is not stored, just used for calculation
+    const difficulty = data.difficulty || 'Medium';
     updateData.weight = calculateTotalWeight(priority, difficulty);
   }
   
   if (data.assigneeIds !== undefined) {
-    updateData.assignees = {
-      set: data.assigneeIds.map(id => ({ id }))
-    };
+    if (data.assigneeIds.length > 0) {
+      updateData.assignees = {
+        set: data.assigneeIds.map(id => ({ id }))
+      };
+    } else {
+      updateData.assignees = {
+        set: []
+      };
+    }
   }
 
   const task = await prisma.task.update({
@@ -218,7 +262,6 @@ async function updateTask(id, data) {
 
   const sideEffects = [recalculateCompletion(task.projectId)];
 
-  // Nếu status thay đổi, thông báo cho tất cả assignees
   if (data.status !== undefined) {
     const assignees = task.assignees || [];
     if (assignees.length > 0) {
@@ -233,7 +276,6 @@ async function updateTask(id, data) {
     }
   }
 
-  // Nếu có thêm người mới được gán
   if (data.assigneeIds !== undefined && data.assigneeIds.length > 0) {
     const assignNotifications = data.assigneeIds.map(userId => ({
       userId,
@@ -274,11 +316,35 @@ async function updateTaskProgress(id, progress) {
     err.statusCode = 400;
     throw err;
   }
-  return prisma.task.update({
+  
+  const task = await prisma.task.update({
     where: { id },
     data: { progress: val },
     include: { assignees: { select: { id: true, name: true, email: true } } },
   });
+  
+  // Auto-update status based on progress
+  let newStatus = null;
+  if (val >= 100 && task.status !== 'Done') {
+    newStatus = 'Done';
+  } else if (val > 0 && task.status === 'Not Started') {
+    newStatus = 'In Progress';
+  } else if (val === 0 && task.status === 'In Progress') {
+    newStatus = 'Not Started';
+  }
+  
+  if (newStatus) {
+    const updatedTask = await prisma.task.update({
+      where: { id },
+      data: { status: newStatus },
+      include: { assignees: { select: { id: true, name: true, email: true } } },
+    });
+    await recalculateCompletion(task.projectId);
+    return updatedTask;
+  }
+  
+  await recalculateCompletion(task.projectId);
+  return task;
 }
 
 // ─── Xoá task ─────────────────────────────────────────────────────────────────
@@ -289,8 +355,9 @@ async function deleteTask(id) {
 }
 
 // ─── Lấy gợi ý những người có thể giúp đỡ task quá hạn ──────────────────────
-async function getTaskRecommendations(taskId) {
-  // Lấy thông tin task và project
+async function getTaskRecommendations(taskId, memberDetails = {}) {
+  console.log('getTaskRecommendations called with memberDetails:', memberDetails);
+  
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
@@ -308,8 +375,7 @@ async function getTaskRecommendations(taskId) {
     throw new Error('Không tìm thấy công việc');
   }
 
-  // Kiểm tra xem task có quá hạn không
-  if (!task.due) {
+  if (!task.dueDate) {
     return {
       task: { id: task.id, title: task.title },
       isOverdue: false,
@@ -317,21 +383,9 @@ async function getTaskRecommendations(taskId) {
     };
   }
 
-  // Parse date string
-  const dateMatch = task.due.match(/(\d+)\s+tháng\s+(\d+),\s+(\d+)/);
-  let dueDate;
-  
-  if (dateMatch) {
-    const day = parseInt(dateMatch[1], 10);
-    const month = parseInt(dateMatch[2], 10);
-    const year = parseInt(dateMatch[3], 10);
-    dueDate = new Date(year, month - 1, day);
-  } else {
-    dueDate = new Date(task.due);
-  }
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const dueDate = new Date(task.dueDate);
   dueDate.setHours(0, 0, 0, 0);
   
   const isOverdue = dueDate < today;
@@ -345,7 +399,7 @@ async function getTaskRecommendations(taskId) {
   }
 
   const currentAssigneeIds = task.assignees.map(a => a.id);
-  const currentTaskWeight = task.weight || 4; // Weight is our combined complexity score
+  const currentTaskWeight = task.weight || 4;
 
   const recommendations = [];
 
@@ -354,12 +408,10 @@ async function getTaskRecommendations(taskId) {
       continue;
     }
 
-    // Tìm tất cả tasks của người này trong project
     const memberTasks = task.project.tasks.filter(t =>
       t.assignees.some(a => a.id === member.id)
     );
 
-    // Kiểm tra xem người này đã hoàn thành tất cả tasks chưa
     const allTasksCompleted = memberTasks.every(t => t.status === 'Done');
 
     if (!allTasksCompleted) {
@@ -369,27 +421,49 @@ async function getTaskRecommendations(taskId) {
     let totalWeight = 0;
     let experienceBonus = 0;
     
+    // Get member details from the passed object
+    const memberDetail = memberDetails[member.id];
+    console.log(`Member ${member.name} details:`, memberDetail);
+
     if (memberTasks.length > 0) {
       for (const t of memberTasks) {
         const taskWeight = t.weight || 4;
         totalWeight += taskWeight;
         
-        // Bonus for completing tasks with similar complexity
         const weightDiff = Math.abs(taskWeight - currentTaskWeight);
         if (weightDiff <= 2) {
-          experienceBonus += 1; // Very similar complexity
+          experienceBonus += 1;
         } else if (weightDiff <= 4) {
-          experienceBonus += 0.5; // Somewhat similar
+          experienceBonus += 0.5;
         }
       }
       
-      // Average weight of completed tasks (2-10 range)
       const avgWeight = totalWeight / memberTasks.length;
       
-      // Availability score (0-10)
-      // Higher avgWeight = can handle complex tasks
-      // experienceBonus rewards similar task experience
-      let availabilityScore = (avgWeight / 10) * 8 + (experienceBonus * 0.5);
+      // Calculate availability score based on:
+      // - Past task completion (avgWeight) - 50% weight
+      // - Experience bonus - 10% weight
+      // - Manual availability rating (if provided) - 25% weight
+      // - Skill level (if provided) - 15% weight
+      let availabilityScore = (avgWeight / 10) * 5; // 50% from past performance
+      availabilityScore += experienceBonus * 0.5; // 10% from experience bonus
+      
+      // Add member-provided availability rating (0-10 scale) - 25% weight
+      if (memberDetail?.availability !== undefined) {
+        availabilityScore += (memberDetail.availability / 10) * 2.5;
+        console.log(`  Added availability ${memberDetail.availability}/10 -> +${(memberDetail.availability / 10) * 2.5}`);
+      } else {
+        availabilityScore += 1.25; // Default neutral score
+      }
+      
+      // Add skill level bonus (0-10 scale) - 15% weight
+      if (memberDetail?.skillLevel !== undefined) {
+        availabilityScore += (memberDetail.skillLevel / 10) * 1.5;
+        console.log(`  Added skill ${memberDetail.skillLevel}/10 -> +${(memberDetail.skillLevel / 10) * 1.5}`);
+      } else {
+        availabilityScore += 0.75; // Default neutral score
+      }
+      
       availabilityScore = Math.min(10, availabilityScore);
       
       recommendations.push({
@@ -400,10 +474,32 @@ async function getTaskRecommendations(taskId) {
         avgWeight: avgWeight.toFixed(1),
         experienceBonus: experienceBonus,
         availabilityScore: parseFloat(availabilityScore.toFixed(1)),
-        canHandleCurrentTask: avgWeight >= currentTaskWeight
+        canHandleCurrentTask: avgWeight >= currentTaskWeight,
+        availability: memberDetail?.availability,
+        skillLevel: memberDetail?.skillLevel
       });
     } else {
-      // No tasks completed - neutral score
+      // No tasks completed - use member-provided ratings as primary factor
+      let availabilityScore = 2.0; // Base score
+      
+      // 60% from availability rating
+      if (memberDetail?.availability !== undefined) {
+        availabilityScore += (memberDetail.availability / 10) * 6;
+        console.log(`  New member - availability ${memberDetail.availability}/10 -> +${(memberDetail.availability / 10) * 6}`);
+      } else {
+        availabilityScore += 3; // Default
+      }
+      
+      // 40% from skill level
+      if (memberDetail?.skillLevel !== undefined) {
+        availabilityScore += (memberDetail.skillLevel / 10) * 4;
+        console.log(`  New member - skill ${memberDetail.skillLevel}/10 -> +${(memberDetail.skillLevel / 10) * 4}`);
+      } else {
+        availabilityScore += 2; // Default
+      }
+      
+      availabilityScore = Math.min(10, availabilityScore);
+      
       recommendations.push({
         id: member.id,
         name: member.name,
@@ -411,16 +507,19 @@ async function getTaskRecommendations(taskId) {
         completedTasks: 0,
         avgWeight: '0',
         experienceBonus: 0,
-        availabilityScore: 3.0,
-        canHandleCurrentTask: false
+        availabilityScore: parseFloat(availabilityScore.toFixed(1)),
+        canHandleCurrentTask: false,
+        availability: memberDetail?.availability,
+        skillLevel: memberDetail?.skillLevel
       });
     }
   }
 
-  // Sắp xếp theo availabilityScore từ cao đến thấp
+  // Sort by availability score (higher is better)
   recommendations.sort((a, b) => b.availabilityScore - a.availabilityScore);
+  
+  console.log('Final recommendations:', recommendations.map(r => ({ name: r.name, score: r.availabilityScore, availability: r.availability, skill: r.skillLevel })));
 
-  // Determine complexity level for display
   const getComplexityLevel = (weight) => {
     if (weight <= 3) return 'Low';
     if (weight <= 5) return 'Medium';

@@ -20,6 +20,7 @@ export interface Project {
   description: string;
   status: string;
   owner: string;
+  ownerId?: string;
   dates: string;
   priority: string;
   completion: number;
@@ -52,7 +53,8 @@ export interface Task {
   priority?: 'Low' | 'Medium' | 'High' | 'Very High';
   summary?: string;
   icon?: string;
-  weight?: number; // Combined complexity score (2-10)
+  weight?: number;
+  progress?: number;
   createdAt?: string;
   updatedAt?: string;
   assignees?: User[];
@@ -68,6 +70,14 @@ export interface Notification {
   read: boolean;
   link?: string;
   createdAt: string;
+}
+
+export interface MemberDetails {
+  userId: string;
+  availability: number;
+  skillLevel: number;
+  notes?: string;
+  lastUpdated: string;
 }
 
 export interface TaskRecommendationsResponse {
@@ -94,6 +104,16 @@ export interface TaskRecommendation {
   experienceBonus: number;
   availabilityScore: number;
   canHandleCurrentTask: boolean;
+  availability?: number;
+  skillLevel?: number;
+}
+
+export interface ProjectContribution {
+  projectId: string;
+  projectName: string;
+  projectIcon: string;
+  tasksCompleted: number;
+  totalWeight: number;
 }
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
@@ -109,7 +129,6 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     'Content-Type': 'application/json',
   };
 
-  // Only add Authorization header if it exists
   if (authHeaders['Authorization']) {
     headers['Authorization'] = authHeaders['Authorization'];
   }
@@ -129,6 +148,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({}));
     if (res.status === 401) {
       localStorage.removeItem('token');
+      window.location.href = '/login';
     }
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
@@ -229,6 +249,9 @@ export const getTasks = (projectId?: string): Promise<Task[]> => {
 export const getProjectTasks = (projectId: string): Promise<Task[]> =>
   request<Task[]>(`/api/projects/${projectId}/tasks`);
 
+export const getTaskById = (id: string): Promise<Task> =>
+  request<Task>(`/api/tasks/${id}`);
+
 export const getOverdueTasks = (): Promise<Task[]> =>
   request<Task[]>('/api/tasks/overdue');
 
@@ -259,8 +282,11 @@ export const updateTaskProgress = (id: string, progress: number): Promise<Task> 
 export const deleteTask = (id: string): Promise<void> =>
   request<void>(`/api/tasks/${id}`, { method: 'DELETE' });
 
-export const getTaskRecommendations = (taskId: string): Promise<TaskRecommendationsResponse> =>
-  request<TaskRecommendationsResponse>(`/api/tasks/${taskId}/recommendations`);
+export const getTaskRecommendations = (taskId: string, memberDetails?: Record<string, MemberDetails>): Promise<TaskRecommendationsResponse> =>
+  request<TaskRecommendationsResponse>(`/api/tasks/${taskId}/recommendations`, {
+    method: 'POST',
+    body: JSON.stringify({ memberDetails: memberDetails || {} }),
+  });
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 

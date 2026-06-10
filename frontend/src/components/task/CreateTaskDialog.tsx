@@ -71,6 +71,7 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
         status,
         assigneeIds,
         priority,
+        difficulty,
         due,
         summary,
         weight: combinedWeight,
@@ -337,7 +338,7 @@ export function CreateTaskDialog({ open, onClose, onCreate, project }: CreateTas
                   </div>
                 </div>
 
-                {/* Due Date - Fixed to allow calendar popup to show */}
+                {/* Due Date */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 relative">
                   <div className="flex items-center gap-2 text-gray-400 w-28">
                     <Calendar className="w-4 h-4" />

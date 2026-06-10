@@ -296,6 +296,7 @@ export default function App() {
             ) : (
               <ProjectList
                 projects={projects}
+                tasks={tasks}
                 onSelectProject={setSelectedProjectId}
                 onCreateProject={(status) => {
                   setCreateProjectStatus(status || 'Planning');
