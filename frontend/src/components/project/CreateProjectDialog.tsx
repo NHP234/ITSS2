@@ -6,7 +6,7 @@ import { Plus, Target, Users, Calendar, ChevronDown, MessageSquare, LayoutGrid, 
 import { CustomDatePicker } from '../common/CustomDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { searchUsers } from '../../api';
-import { UserPlus, X, CheckCircle2 } from 'lucide-react';
+import { UserPlus, X, CheckCircle2, Trash2, MinusCircle } from 'lucide-react';
 
 interface CreateProjectDialogProps {
   open: boolean;
