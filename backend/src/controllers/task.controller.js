@@ -148,7 +148,9 @@ async function remove(req, res) {
 async function getRecommendations(req, res) {
   try {
     await verifyTaskAccess(req.params.id, req.userId);
-    const recommendations = await taskService.getTaskRecommendations(req.params.id);
+    const { memberDetails } = req.body;
+    console.log('Received member details:', memberDetails);
+    const recommendations = await taskService.getTaskRecommendations(req.params.id, memberDetails);
     res.json(recommendations);
   } catch (err) {
     console.error('[Task] getRecommendations:', err.message);

@@ -1,12 +1,15 @@
 import { useState, memo, useMemo } from 'react';
 import { 
   CheckSquare, Target, LayoutGrid, List, Filter, ArrowUpDown, Sparkles, Search, SlidersHorizontal, 
-  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, TrendingUp, Activity
+  ChevronDown, Plus, Users, Calendar, AlignLeft, Cloud, FileText, ChevronRight, Trash2, TrendingUp, Activity,
+  UserCircle
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { CustomDatePicker } from '../components/common/CustomDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { useTaskProgress } from '../hooks/useTaskProgress';
+import { MembersList } from '../components/task/MembersList';
 
 import { type Project, type Task } from '../api';
 
@@ -18,6 +21,8 @@ interface AllTasksViewProps {
   onDeleteTask?: (taskId: string) => void;
   onSelectProject?: (projectId: string) => void;
   onUpdateTaskStatus?: (taskId: string, status: "Not Started" | "In Progress" | "Done") => void;
+  onUpdateProject?: (projectId: string, updates: Partial<Project>) => void;
+  currentUserId?: string;
 }
 
 // Helper to get status label in Vietnamese
@@ -62,13 +67,17 @@ export const AllTasksView = memo(function AllTasksView({
   onCreateTask, 
   onDeleteTask, 
   onSelectProject,
-  onUpdateTaskStatus
+  onUpdateTaskStatus,
+  onUpdateProject,
+  currentUserId
 }: AllTasksViewProps) {
-  const [activeTab, setActiveTab] = useState<'By project' | 'Board' | 'All tasks'>('Board');
+  const { getTaskProgress, setTaskProgress } = useTaskProgress();
+  const [activeTab, setActiveTab] = useState<'By project' | 'Board' | 'All tasks' | 'Members'>('Board');
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
     projects.reduce((acc, p) => ({ ...acc, [p.id]: true }), {})
   );
   const [taskSearch, setTaskSearch] = useState('');
+  const [selectedProjectForMembers, setSelectedProjectForMembers] = useState<Project | null>(null);
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects(prev => ({ ...prev, [projectId]: !prev[projectId] }));
@@ -87,41 +96,49 @@ export const AllTasksView = memo(function AllTasksView({
     return false;
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Done':
-        return (
-          <div className="inline-flex items-center gap-1.5 bg-green-900/40 border border-green-800 px-2 py-0.5 rounded-full">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-xs text-green-100 font-medium">Hoàn thành</span>
-          </div>
-        );
-      case 'In Progress':
-        return (
-          <div className="inline-flex items-center gap-1.5 bg-blue-900/40 border border-blue-800 px-2 py-0.5 rounded-full">
-            <div className="w-2 h-2 rounded-full bg-blue-500" />
-            <span className="text-xs text-blue-100 font-medium">Đang thực hiện</span>
-          </div>
-        );
-      case 'Reviewing':
-        return (
-          <div className="inline-flex items-center gap-1.5 bg-amber-900/40 border border-amber-800 px-2 py-0.5 rounded-full">
-            <div className="w-2 h-2 rounded-full bg-amber-400" />
-            <span className="text-xs text-amber-100 font-medium">Reviewing</span>
-          </div>
-        );
-      default:
-        return (
-          <div className="inline-flex items-center gap-1.5 bg-[#444] border border-[#555] px-2 py-0.5 rounded-full">
-            <div className="w-2 h-2 rounded-full bg-gray-400" />
-            <span className="text-xs text-white font-medium">Chưa bắt đầu</span>
-          </div>
-        );
+  const getProgress = (taskId: string, taskStatus: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return taskStatus === 'Done' ? 100 : 0;
+    return getTaskProgress(task.projectId, taskId, taskStatus);
+  };
+
+  const handleProgressUpdate = async (taskId: string, newProgress: number) => {
+    const clampedProgress = Math.min(100, Math.max(0, newProgress));
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      setTaskProgress(task.projectId, taskId, clampedProgress);
+      
+      let newStatus = task.status;
+      if (clampedProgress >= 100 && task.status !== 'Done') {
+        newStatus = 'Done';
+      } else if (clampedProgress > 0 && task.status === 'Not Started') {
+        newStatus = 'In Progress';
+      } else if (clampedProgress === 0 && task.status === 'In Progress') {
+        newStatus = 'Not Started';
+      }
+      
+      if (newStatus !== task.status) {
+        if (onUpdateTaskStatus) {
+          onUpdateTaskStatus(taskId, newStatus as any);
+        } else {
+          onUpdateTask(taskId, { status: newStatus });
+        }
+      }
     }
   };
 
-  // Handle moving task between statuses
-  const handleMoveTask = (taskId: string, newStatus: "Not Started" | "In Progress" | "Reviewing" | "Done") => {
+  const handleMoveTask = (taskId: string, newStatus: "Not Started" | "In Progress" | "Done") => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      if (newStatus === 'Done') {
+        setTaskProgress(task.projectId, taskId, 100);
+      } else {
+        const currentProgress = getTaskProgress(task.projectId, taskId);
+        if (currentProgress === 100) {
+          setTaskProgress(task.projectId, taskId, 0);
+        }
+      }
+    }
     if (onUpdateTaskStatus) {
       onUpdateTaskStatus(taskId, newStatus);
     } else {
@@ -181,7 +198,7 @@ export const AllTasksView = memo(function AllTasksView({
                 </th>
                 <th className="font-medium py-2 px-4 w-24">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="w-3.5 h-3.5" /> Progress
+                    <TrendingUp className="w-3.5 h-3.5" /> Tiến độ
                   </div>
                 </th>
                 <th className="font-medium py-2 px-4">
@@ -195,6 +212,7 @@ export const AllTasksView = memo(function AllTasksView({
             <tbody>
               {projectTasks.map((task) => {
                 const overdue = isOverdue(task);
+                const progress = getProgress(task.id, task.status);
                 return (
                   <tr key={task.id} className={`border-b border-gray-800/50 group ${overdue ? 'bg-red-950/10 hover:bg-red-950/20' : 'hover:bg-[#222]'}`}>
                     <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
@@ -216,7 +234,6 @@ export const AllTasksView = memo(function AllTasksView({
                           <button className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                             task.status === 'Not Started' ? 'bg-gray-700 text-gray-300' :
                             task.status === 'In Progress' ? 'bg-blue-900/50 text-blue-200' :
-                            task.status === 'Reviewing' ? 'bg-amber-900/50 text-amber-200' :
                             'bg-green-900/50 text-green-200'
                           }`}>
                             {getStatusLabel(task.status)}
@@ -224,7 +241,7 @@ export const AllTasksView = memo(function AllTasksView({
                           </button>
                         </PopoverTrigger>
                         <PopoverContent className="w-36 bg-[#1e1e1e] border-[#333] p-1 shadow-2xl rounded-lg z-50">
-                          {['Not Started', 'In Progress', 'Reviewing', 'Done'].map(status => (
+                          {['Not Started', 'In Progress', 'Done'].map(status => (
                             <button
                               key={status}
                               type="button"
@@ -277,13 +294,32 @@ export const AllTasksView = memo(function AllTasksView({
                     </td>
                     <td className="py-2 px-4 border-r border-gray-800/50">
                       <div className="flex items-center gap-1.5">
-                        <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                        <div 
+                          className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden cursor-pointer"
+                          onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const width = rect.width;
+                            const newProgress = Math.round((x / width) * 100);
+                            handleProgressUpdate(task.id, newProgress);
+                          }}
+                        >
                           <div
-                            className={`h-full rounded-full ${ (task.progress ?? 0) >= 100 ? 'bg-green-500' : (task.progress ?? 0) >= 50 ? 'bg-blue-500' : 'bg-orange-500'}`}
-                            style={{ width: `${task.progress ?? 0}%` }}
+                            className={`h-full rounded-full ${progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-orange-500'}`}
+                            style={{ width: `${progress}%` }}
                           />
                         </div>
-                        <span className="text-[10px] text-gray-400 w-7">{task.progress ?? 0}%</span>
+                        <input
+                          type="text"
+                          value={progress}
+                          onChange={(e) => {
+                            let val = parseInt(e.target.value);
+                            if (isNaN(val)) val = 0;
+                            handleProgressUpdate(task.id, Math.min(100, Math.max(0, val)));
+                          }}
+                          className="w-10 px-1 py-0.5 text-center text-[10px] rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-blue-500"
+                        />
+                        <span className="text-[10px] text-gray-500">%</span>
                       </div>
                     </td>
                     <td className="py-2 px-4 border-r border-gray-800/50 text-gray-300">
@@ -306,7 +342,7 @@ export const AllTasksView = memo(function AllTasksView({
                 );
               })}
               <tr>
-                <td colSpan={7} className="py-2 pl-8 text-gray-500 hover:bg-[#222] cursor-pointer" onClick={() => onCreateTask(projectId, 'Not Started')}>
+                <td colSpan={8} className="py-2 pl-8 text-gray-500 hover:bg-[#222] cursor-pointer" onClick={() => onCreateTask(projectId, 'Not Started')}>
                   <div className="flex items-center gap-2 text-sm">
                     <Plus className="w-4 h-4" /> Nhiệm vụ mới
                   </div>
@@ -397,6 +433,7 @@ export const AllTasksView = memo(function AllTasksView({
           <tbody>
             {allTasks.map((task) => {
               const project = projects.find(p => p.id === task.projectId);
+              const progress = getProgress(task.id, task.status);
               return (
                 <tr key={task.id} className="border-b border-gray-800/50 hover:bg-[#222] group">
                   <td className="py-2 pl-8 pr-4 border-r border-gray-800/50">
@@ -447,7 +484,7 @@ export const AllTasksView = memo(function AllTasksView({
                           <button
                             key={status}
                             type="button"
-                            onClick={() => handleMoveTask(task.id, status as "Not Started" | "In Progress" | "Done")}
+                            onClick={() => handleMoveTask(task.id, status as any)}
                             className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
                               status === task.status ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-800'
                             }`}
@@ -543,8 +580,8 @@ export const AllTasksView = memo(function AllTasksView({
   }, [filteredTasks]);
 
   const renderBoardView = () => {
-    const statuses = ['Not Started', 'In Progress', 'Reviewing', 'Done'];
-    const statusLabels = ['Chưa bắt đầu', 'Đang thực hiện', 'Reviewing', 'Hoàn thành'];
+    const statuses = ['Not Started', 'In Progress', 'Done'];
+    const statusLabels = ['Chưa bắt đầu', 'Đang thực hiện', 'Hoàn thành'];
     
     return (
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
@@ -560,18 +597,10 @@ export const AllTasksView = memo(function AllTasksView({
             headerColor = 'bg-blue-900/50 text-blue-300';
             bgColor = 'bg-[#1a202c]/30 border-blue-900/30';
             dotColor = 'bg-blue-500';
-          } else if (status === 'Reviewing') {
-            headerColor = 'bg-amber-900/50 text-amber-300';
-            bgColor = 'bg-[#2c2400]/30 border-amber-900/30';
-            dotColor = 'bg-amber-400';
           } else if (status === 'Done') {
             headerColor = 'bg-green-900/50 text-green-300';
             bgColor = 'bg-[#1a2c1f]/30 border-green-900/30';
             dotColor = 'bg-green-500';
-          } else {
-            headerColor = 'bg-gray-800 text-gray-300';
-            bgColor = 'bg-[#1a1a1a] border-gray-800/60';
-            dotColor = 'bg-gray-400';
           }
 
           return (
@@ -581,19 +610,15 @@ export const AllTasksView = memo(function AllTasksView({
                   <div className={`w-2 h-2 rounded-full ${dotColor}`} />
                   {statusLabel}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-300 h-6 w-8 p-0">
-                    ...
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-300 h-6 w-8 p-0">
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
+                <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-300 h-6 w-8 p-0">
+                  <Plus className="w-4 h-4" onClick={() => onCreateTask(projects[0]?.id || '', status)} />
+                </Button>
               </div>
               
               <div className="space-y-3 flex-1 overflow-y-auto pr-1">
                 {statusTasks.map(task => {
                   const project = projects.find(p => p.id === task.projectId);
+                  const progress = getProgress(task.id, task.status);
                   return (
                     <div 
                       key={task.id} 
@@ -607,52 +632,79 @@ export const AllTasksView = memo(function AllTasksView({
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button className="text-gray-500 hover:text-white p-1 rounded hover:bg-gray-700" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(task.id); }}><Trash2 className="w-3.5 h-3.5 text-red-500/70" /></button>
-                          <button className="text-gray-500 hover:text-white p-1 rounded hover:bg-gray-700"><AlignLeft className="w-3.5 h-3.5" /></button>
-                          <button className="text-gray-500 hover:text-white p-1 rounded hover:bg-gray-700">...</button>
                         </div>
                       </div>
-                      
-                      {task.assignee && (
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px] text-gray-300">
-                            {task.assignee.charAt(0)}
-                          </div>
-                          <span className="text-[13px] text-gray-400 font-medium">{task.assignee}</span>
-                        </div>
-                      )}
                       
                       {project && (
                         <div className="flex items-center gap-2 mb-3 bg-[#1a1a1a] rounded p-1.5 px-2">
                           <span className="text-sm leading-none">{project.icon}</span>
                           <span className="text-[12px] text-gray-300 truncate font-medium">{project.name}</span>
-                          <span className="text-[10px] text-gray-500 ml-auto uppercase bg-gray-800 px-1 rounded">Dự án</span>
                         </div>
                       )}
                       
-                      <div className="flex items-center justify-between mt-auto pt-1">
-                        {getPriorityBadge(task.priority)}
-                        {task.due && (
-                          <span className="text-[10px] text-gray-500">
-                            <Calendar className="w-3 h-3 inline mr-1" />
-                            {task.due}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between mt-auto">
+                        <div className="flex items-center gap-2">
+                          {getPriorityBadge(task.priority)}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+                          </div>
+                          <span className="text-[10px] text-gray-400">{progress}%</span>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
-                <Button 
-                  variant="ghost" 
-                  className="w-full text-gray-500 hover:text-gray-300 hover:bg-[#2a2a2a] justify-start text-sm font-medium py-2 h-auto mt-2 border border-dashed border-gray-700/50"
-                  onClick={() => onCreateTask(projects[0]?.id || '', status)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nhiệm vụ mới
-                </Button>
               </div>
             </div>
           );
         })}
+      </div>
+    );
+  };
+
+  const renderMembersView = () => {
+    // Show members for the selected project or first project
+    const projectToShow = selectedProjectForMembers || projects[0];
+    
+    if (!projectToShow) {
+      return (
+        <div className="text-center py-12">
+          <UserCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-500">Chưa có dự án nào</p>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        {/* Project selector for members view */}
+        {projects.length > 1 && (
+          <div className="mb-6 flex items-center gap-3">
+            <label className="text-sm text-gray-400">Chọn dự án:</label>
+            <select
+              value={projectToShow.id}
+              onChange={(e) => {
+                const selected = projects.find(p => p.id === e.target.value);
+                setSelectedProjectForMembers(selected || null);
+              }}
+              className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+            >
+              {projects.map(project => (
+                <option key={project.id} value={project.id}>
+                  {project.icon} {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        
+        <MembersList
+          project={projectToShow}
+          onUpdateProject={onUpdateProject}
+          currentUserId={currentUserId}
+        />
       </div>
     );
   };
@@ -684,6 +736,12 @@ export const AllTasksView = memo(function AllTasksView({
           >
             <List className="w-4 h-4" /> Tất cả nhiệm vụ
           </button>
+          <button 
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'Members' ? 'bg-[#2a2a2a] text-white' : 'text-gray-400 hover:text-white hover:bg-[#2a2a2a]'}`}
+            onClick={() => setActiveTab('Members')}
+          >
+            <Users className="w-4 h-4" /> Thành viên
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -712,6 +770,7 @@ export const AllTasksView = memo(function AllTasksView({
         {activeTab === 'By project' && renderByProjectView()}
         {activeTab === 'Board' && renderBoardView()}
         {activeTab === 'All tasks' && renderAllTasksView()}
+        {activeTab === 'Members' && renderMembersView()}
       </div>
     </div>
   );
