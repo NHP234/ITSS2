@@ -122,4 +122,4 @@ async function getRecommendations(req, res) {
   }
 }
 
-module.exports = { getAll, getOne, create, update, updateStatus, remove, getRecommendations };
+module.exports = { getAll, getOne, create, update, updateStatus, updateProgress, remove, getRecommendations };
