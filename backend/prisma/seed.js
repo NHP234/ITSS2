@@ -1,18 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
-const prisma = new PrismaClient();
-
-async function main() {
-  console.log('🌱 Seeding database...');
-
-  // Xoá dữ liệu cũ
-  await prisma.notification.deleteMany();
-  await prisma.projectLink.deleteMany();
-  await prisma.task.deleteMany();
-  await prisma.project.deleteMany();
-  await prisma.user.deleteMany();
-
+async function seed(prisma) {
   const passwordHash = await bcrypt.hash('password123', 10);
 
   // 1. TẠO 10 USERS
@@ -36,7 +25,7 @@ async function main() {
     });
     createdUsers.push(user);
   }
-  const mainUser = createdUsers[0]; // Bình
+  const mainUser = createdUsers[0];
 
   // 2. TẠO 10 PROJECTS
   const projectsData = [
@@ -55,10 +44,11 @@ async function main() {
   const createdProjects = [];
   for (let i = 0; i < projectsData.length; i++) {
     const pData = projectsData[i];
-    // Chọn ngẫu nhiên 3-5 thành viên cho dự án, luôn có Bình
     const shuffledUsers = [...createdUsers].sort(() => 0.5 - Math.random());
-    const memberCount = Math.floor(Math.random() * 3) + 3; // 3 to 5
-    const members = [mainUser, ...shuffledUsers.slice(0, memberCount)].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i); // Ensure unique
+    const memberCount = Math.floor(Math.random() * 3) + 3;
+    const members = [mainUser, ...shuffledUsers.slice(0, memberCount)].filter(
+      (v, i, a) => a.findIndex(t => t.id === v.id) === i
+    );
 
     const project = await prisma.project.create({
       data: {
@@ -75,7 +65,6 @@ async function main() {
     });
     createdProjects.push({ ...project, _members: members });
 
-    // Tạo 2 Links mẫu cho mỗi dự án
     await prisma.projectLink.createMany({
       data: [
         { title: 'Tài liệu hướng dẫn', url: 'https://docs.google.com', projectId: project.id },
@@ -84,7 +73,7 @@ async function main() {
     });
   }
 
-  // 3. TẠO TASKS CHO TỪNG PROJECT (mỗi project 5-8 tasks)
+  // 3. TẠO TASKS CHO TỪNG PROJECT
   const taskTemplates = [
     { title: 'Lên kế hoạch', status: 'Done', icon: '📅', priority: 'High' },
     { title: 'Thu thập yêu cầu', status: 'Done', icon: '📝', priority: 'High' },
@@ -99,18 +88,13 @@ async function main() {
   ];
 
   for (const p of createdProjects) {
-    const numTasks = Math.floor(Math.random() * 4) + 5; // 5 to 8
-    
+    const numTasks = Math.floor(Math.random() * 4) + 5;
     for (let i = 0; i < numTasks; i++) {
       const template = taskTemplates[i];
-      // Randomly assign 1-2 members from the project
       const assignees = [...p._members].sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 2) + 1);
-
-      // Random status mapping based on project status
       let taskStatus = template.status;
       if (p.status === 'Planning' || p.status === 'Backlog') taskStatus = 'Not Started';
       if (p.status === 'Done') taskStatus = 'Done';
-      
       await prisma.task.create({
         data: {
           title: template.title,
@@ -119,30 +103,39 @@ async function main() {
           due: '20 tháng 10, 2025',
           priority: template.priority,
           icon: template.icon,
-          weight: Math.floor(Math.random() * 3) + 1, // 1 to 3
+          weight: Math.floor(Math.random() * 3) + 1,
           assignee: assignees.map(a => a.name).join(', '),
           assignees: { connect: assignees.map(a => ({ id: a.id })) }
         }
       });
     }
-
-    // Tính lại completion
     const tasks = await prisma.task.findMany({ where: { projectId: p.id } });
     if (tasks.length > 0) {
       const totalWeight = tasks.reduce((sum, t) => sum + (t.weight || 1), 0);
       const doneWeight = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.weight || 1), 0);
-      const completion = Math.round((doneWeight / totalWeight) * 10000) / 100;
-      await prisma.project.update({ where: { id: p.id }, data: { completion } });
+      await prisma.project.update({ where: { id: p.id }, data: { completion: Math.round((doneWeight / totalWeight) * 10000) / 100 } });
     }
   }
 
   const userCount = await prisma.user.count();
   const projectCount = await prisma.project.count();
   const taskCount = await prisma.task.count();
-
   console.log(`✅ Seed hoàn thành! ${userCount} users, ${projectCount} projects, ${taskCount} tasks`);
 }
 
-main()
-  .catch(err => { console.error('❌ Seed thất bại:', err); process.exit(1); })
-  .finally(() => prisma.$disconnect());
+module.exports = { seed };
+
+if (require.main === module) {
+  const prisma = new PrismaClient();
+  (async () => {
+    console.log('🌱 Seeding database...');
+    await prisma.notification.deleteMany();
+    await prisma.projectLink.deleteMany();
+    await prisma.task.deleteMany();
+    await prisma.project.deleteMany();
+    await prisma.user.deleteMany();
+    await seed(prisma);
+  })()
+    .catch(err => { console.error('❌ Seed thất bại:', err); process.exit(1); })
+    .finally(() => prisma.$disconnect());
+}

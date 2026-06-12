@@ -1,16 +1,33 @@
-const app    = require('./app');
-const prisma = require('./prisma/client');
+const app     = require('./app');
+const prisma  = require('./prisma/client');
+const { seed }   = require('../prisma/seed');
 const { startDeadlineChecks } = require('./services/deadlineCheck.service');
 
 const PORT = process.env.PORT || 3001;
 
+async function autoSeed() {
+  const existing = await prisma.user.findUnique({ where: { email: 'binh@example.com' } });
+  if (existing) return;
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    console.log('⚠️ Có user nhưng thiếu binh@example.com — xoá để seed lại...');
+    await prisma.notification.deleteMany();
+    await prisma.projectLink.deleteMany();
+    await prisma.task.deleteMany();
+    await prisma.project.deleteMany();
+    await prisma.user.deleteMany();
+  }
+  console.log('🌱 DB trống — tự động seed...');
+  await seed(prisma);
+}
+
 async function main() {
-  // Thử kết nối database
   try {
     await prisma.$connect();
     console.log('✅ Đã kết nối PostgreSQL');
-    
-    // Khởi động trình kiểm tra hạn chót nhiệm vụ
+
+    await autoSeed();
+
     startDeadlineChecks();
   } catch {
     console.warn('⚠️  Chưa kết nối được DB (chưa chạy Docker?)');

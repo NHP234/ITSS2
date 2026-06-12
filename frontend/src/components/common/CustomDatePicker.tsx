@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Input } from '../ui/input';
 import { Calendar } from '../ui/calendar';
-import { Switch } from '../ui/switch';
-import { ChevronRight } from 'lucide-react';
+import { X, Calendar as CalendarIcon } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { format, parse, isValid } from 'date-fns';
 
@@ -20,164 +18,142 @@ export function CustomDatePicker({ date, range, onSelect, onRangeSelect, trigger
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(date);
   const [selectedRange, setSelectedRange] = useState<DateRange | undefined>(range);
   const [isRangeMode, setIsRangeMode] = useState(mode === 'range' || !!range);
+  const [isOpen, setIsOpen] = useState(false);
 
-  // States for manual input
-  const [fromInput, setFromInput] = useState('');
-  const [toInput, setToInput] = useState('');
+  // Format date to Vietnamese format
+  const formatToVietnamese = (d: Date): string => {
+    return `${d.getDate()} tháng ${d.getMonth() + 1}, ${d.getFullYear()}`;
+  };
 
-  // Sync inputs with selected values
-  useEffect(() => {
-    if (isRangeMode) {
-      setFromInput(selectedRange?.from ? format(selectedRange.from, 'dd/MM/yyyy') : '');
-      setToInput(selectedRange?.to ? format(selectedRange.to, 'dd/MM/yyyy') : '');
-    } else {
-      setFromInput(selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '');
-    }
-  }, [selectedRange, selectedDate, isRangeMode]);
+  const handleDateSelect = (val: Date | undefined) => {
+    if (isRangeMode) return;
+    setSelectedDate(val);
+    if (onSelect) onSelect(val);
+    setIsOpen(false);
+  };
 
-  const handleManualInput = (val: string, type: 'from' | 'to') => {
-    if (type === 'from') {
-      setFromInput(val);
-      const parsed = parse(val, 'dd/MM/yyyy', new Date());
-      if (isValid(parsed) && val.length === 10) {
-        if (isRangeMode) {
-          const newRange = { ...selectedRange, from: parsed } as DateRange;
-          setSelectedRange(newRange);
-          if (onRangeSelect) onRangeSelect(newRange);
-        } else {
-          setSelectedDate(parsed);
-          if (onSelect) onSelect(parsed);
-        }
-      }
-    } else {
-      setToInput(val);
-      const parsed = parse(val, 'dd/MM/yyyy', new Date());
-      if (isValid(parsed) && val.length === 10) {
-        const newRange = { ...selectedRange, to: parsed } as DateRange;
-        setSelectedRange(newRange);
-        if (onRangeSelect) onRangeSelect(newRange);
-      }
+  const handleRangeSelect = (val: DateRange | undefined) => {
+    if (!isRangeMode) return;
+    setSelectedRange(val);
+    if (onRangeSelect) onRangeSelect(val);
+    if (val?.from && val?.to) {
+      setIsOpen(false);
     }
   };
-  
+
+  const handleClear = () => {
+    if (isRangeMode) {
+      setSelectedRange(undefined);
+      if (onRangeSelect) onRangeSelect(undefined);
+    } else {
+      setSelectedDate(undefined);
+      if (onSelect) onSelect(undefined);
+    }
+    setIsOpen(false);
+  };
+
+  const handleToday = () => {
+    const today = new Date();
+    if (isRangeMode) {
+      const newRange = { from: today, to: undefined };
+      setSelectedRange(newRange);
+      if (onRangeSelect) onRangeSelect(newRange);
+    } else {
+      setSelectedDate(today);
+      if (onSelect) onSelect(today);
+    }
+  };
+
+  // Common classNames for both modes
+  const classNames = {
+    months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+    month: "space-y-3",
+    caption: "flex justify-center pt-1 relative items-center",
+    caption_label: "text-sm font-medium text-gray-200",
+    nav: "space-x-1 flex items-center",
+    nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100 hover:bg-gray-800 rounded-md flex items-center justify-center text-gray-400",
+    nav_button_previous: "absolute left-1",
+    nav_button_next: "absolute right-1",
+    table: "w-full border-collapse space-y-1",
+    head_row: "flex",
+    head_cell: "text-gray-500 rounded-md w-8 font-normal text-[0.8rem]",
+    row: "flex w-full mt-1",
+    cell: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-gray-800 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md",
+    day: "h-8 w-8 p-0 font-normal text-gray-300 aria-selected:opacity-100 hover:bg-gray-800 rounded-md transition-colors",
+    day_selected: "bg-blue-600 text-white hover:bg-blue-700 focus:bg-blue-600 focus:text-white rounded-md",
+    day_today: "bg-gray-800 text-white font-bold",
+    day_outside: "text-gray-600",
+    day_disabled: "text-gray-700 opacity-50",
+    day_range_middle: "aria-selected:bg-gray-800 aria-selected:text-gray-200 rounded-none",
+    day_hidden: "invisible",
+  };
+
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         {trigger}
       </PopoverTrigger>
-      <PopoverContent className="w-80 bg-[#1e1e1e] border-[#333] text-gray-200 p-0 shadow-xl rounded-xl" align="start">
-        <div className="p-4 space-y-4">
-          <div className="flex gap-2 mb-2">
-            <div className="flex-1 space-y-1">
-              <Input 
-                className="h-9 bg-[#2a2a2a] border-gray-700 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-                placeholder="DD/MM/YYYY"
-                value={fromInput}
-                onChange={(e) => handleManualInput(e.target.value, 'from')}
-              />
-            </div>
-            {isRangeMode && (
-              <div className="flex-1 space-y-1">
-                <Input 
-                  className="h-9 bg-[#2a2a2a] border-gray-700 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-                  placeholder="DD/MM/YYYY"
-                  value={toInput}
-                  onChange={(e) => handleManualInput(e.target.value, 'to')}
-                />
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center justify-between px-1 mb-2">
-            <span className="text-sm font-bold">
-              {isRangeMode ? 'Chọn khoảng ngày' : 'Chọn ngày'}
-            </span>
-            <div className="flex gap-2">
-              <button 
+      <PopoverContent className="w-auto p-0 bg-[#1e1e1e] border-gray-700 shadow-xl rounded-lg" align="start" sideOffset={5}>
+        <div className="p-3 space-y-3">
+          {/* Mode Toggle */}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex gap-1 bg-[#2a2a2a] rounded-lg p-0.5">
+              <button
                 type="button"
-                className="text-xs text-gray-400 hover:text-white transition-colors"
-                onClick={() => {
-                  const today = new Date();
-                  if (isRangeMode) {
-                    const newRange = { from: today, to: undefined };
-                    setSelectedRange(newRange);
-                    if (onRangeSelect) onRangeSelect(newRange);
-                  } else {
-                    setSelectedDate(today);
-                    if (onSelect) onSelect(today);
-                  }
-                }}
+                onClick={() => setIsRangeMode(false)}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                  !isRangeMode ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
+                }`}
               >
-                Hôm nay
+                Ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsRangeMode(true)}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                  isRangeMode ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                Khoảng
               </button>
             </div>
-          </div>
-          
-          <Calendar
-            mode={isRangeMode ? "range" : "single"}
-            selected={(isRangeMode ? selectedRange : selectedDate) as any}
-            onSelect={(val: any) => {
-              if (isRangeMode) {
-                setSelectedRange(val);
-                if (onRangeSelect) onRangeSelect(val);
-              } else {
-                setSelectedDate(val);
-                if (onSelect) onSelect(val);
-              }
-            }}
-            className="p-0"
-            classNames={{
-              day_selected: "bg-blue-500 text-white hover:bg-blue-600 focus:bg-blue-500 focus:text-white rounded-md",
-              head_cell: "text-gray-400 font-normal text-xs w-9",
-              cell: "text-center text-sm p-0 w-9 h-9 relative",
-              day: "w-9 h-9 p-0 font-normal aria-selected:opacity-100 hover:bg-gray-800 rounded-md",
-              caption: "flex justify-between pt-1 relative items-center px-2 mb-4",
-              caption_label: "text-sm font-bold",
-              nav: "space-x-1 flex items-center",
-              nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 hover:bg-gray-800 rounded-md flex items-center justify-center",
-            }}
-          />
-          
-          <div className="space-y-4 pt-4 border-t border-gray-800">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-gray-200">Ngày kết thúc</span>
-              <Switch 
-                checked={isRangeMode}
-                onCheckedChange={setIsRangeMode}
-                className="data-[state=checked]:bg-blue-600" 
-              />
-            </div>
-            
-            <button className="flex items-center justify-between w-full hover:bg-gray-800 p-1 -mx-1 rounded">
-              <span className="text-sm font-bold text-gray-200">Định dạng ngày</span>
-              <div className="flex items-center text-gray-400 text-sm">
-                Ngày tháng năm đầy đủ
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </div>
-            </button>
-            
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-gray-200">Bao gồm thời gian</span>
-              <Switch className="data-[state=checked]:bg-blue-600" />
-            </div>
-            
-            <button className="flex items-center justify-between w-full hover:bg-gray-800 p-1 -mx-1 rounded">
-              <span className="text-sm font-bold text-gray-200">Lời nhắc</span>
-              <div className="flex items-center text-gray-400 text-sm">
-                Không
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </div>
-            </button>
-          </div>
-          
-          <div className="pt-4 border-t border-gray-800">
-            <button className="text-sm font-bold text-gray-200 hover:text-white" onClick={() => {
-              setSelectedDate(undefined);
-              setSelectedRange(undefined);
-              if (onSelect) onSelect(undefined);
-              if (onRangeSelect) onRangeSelect(undefined);
-            }}>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+            >
               Xóa
+            </button>
+          </div>
+
+          {/* Calendar - Conditional rendering based on mode */}
+          {!isRangeMode ? (
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={handleDateSelect}
+              className="rounded-lg"
+              classNames={classNames}
+            />
+          ) : (
+            <Calendar
+              mode="range"
+              selected={selectedRange}
+              onSelect={handleRangeSelect}
+              className="rounded-lg"
+              classNames={classNames}
+            />
+          )}
+
+          {/* Today Button */}
+          <div className="flex justify-center pt-2 border-t border-gray-800">
+            <button
+              type="button"
+              onClick={handleToday}
+              className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+            >
+              <CalendarIcon className="w-3 h-3" />
+              Hôm nay
             </button>
           </div>
         </div>
